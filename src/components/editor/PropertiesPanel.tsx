@@ -1,6 +1,23 @@
-import { Field, PanelSection } from "@/components/ui";
+"use client";
+
+import { Field, InputField, PanelSection } from "@/components/ui";
+import { useBrochureEditorStore } from "@/store";
 
 export function PropertiesPanel() {
+  const selectedPageIndex = useBrochureEditorStore(
+    (state) => state.selectedPageIndex,
+  );
+  const coverContent = useBrochureEditorStore(
+    (state) => state.project.pages[selectedPageIndex]?.content,
+  );
+  const updateCoverContent = useBrochureEditorStore(
+    (state) => state.updateCoverContent,
+  );
+
+  if (!coverContent) {
+    return null;
+  }
+
   return (
     <aside
       className="flex w-[300px] shrink-0 flex-col border-l border-rm-neutral-200 bg-rm-white"
@@ -16,13 +33,32 @@ export function PropertiesPanel() {
           <Field label="Page type" value="Cover" />
         </PanelSection>
 
-        <PanelSection title="Template">
-          <Field label="Product name" value="T501 Gen2" />
-          <Field label="Generation" value="Gen2" />
-        </PanelSection>
-
         <PanelSection title="Content">
-          <Field label="Subtitle" value="Advanced Monitoring System" />
+          <InputField
+            label="Eyebrow"
+            value={coverContent.eyebrow}
+            onChange={(value) => updateCoverContent({ eyebrow: value })}
+          />
+          <InputField
+            label="Product name"
+            value={coverContent.productName}
+            onChange={(value) => updateCoverContent({ productName: value })}
+          />
+          <InputField
+            label="Generation"
+            value={coverContent.generation}
+            onChange={(value) => updateCoverContent({ generation: value })}
+          />
+          <InputField
+            label="Subtitle"
+            value={coverContent.subtitle}
+            onChange={(value) => updateCoverContent({ subtitle: value })}
+          />
+          <InputField
+            label="Tagline"
+            value={coverContent.tagline}
+            onChange={(value) => updateCoverContent({ tagline: value })}
+          />
         </PanelSection>
 
         <PanelSection title="Appearance" className="border-b-0 pb-0">

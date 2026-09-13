@@ -1,5 +1,5 @@
-/**
- * Shared TypeScript types for RM Design Studio.
- */
-
-export {};
+export type {
+  BrochureProject,
+  CoverBrochurePage,
+  CoverPageContent,
+} from "./brochure";
