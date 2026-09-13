@@ -1,3 +1,9 @@
+export { DesignCanvas } from "./DesignCanvas";
+export { EditorToolbar } from "./EditorToolbar";
+export { ObjectProperties } from "./ObjectProperties";
 export { PageListItem } from "./PageListItem";
+export { ProjectDialog } from "./ProjectDialog";
+export { ProjectManager } from "./ProjectManager";
 export { PropertiesPanel } from "./PropertiesPanel";
+export { StudioRoot } from "./StudioRoot";
 export { Workspace } from "./Workspace";
