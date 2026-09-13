@@ -36,6 +36,7 @@
   --color-rm-neutral-950: var(--rm-neutral-950);
   --font-heading: var(--font-sora);
   --font-body: var(--font-inter);
+  --font-display: var(--font-orbitron);
 }
 
 body {
