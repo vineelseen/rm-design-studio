@@ -8,7 +8,9 @@ import {
   ArrowUp,
   Bold,
   Copy,
+  Redo2,
   Trash2,
+  Undo2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui";
@@ -19,6 +21,8 @@ export function ContextualToolbar() {
   const mode = useDesignEditorStore((state) => state.mode);
   const selectedObject = useDesignEditorStore((state) => state.selectedObject);
   const canvasController = useDesignEditorStore((state) => state.canvasController);
+  const canUndo = useDesignEditorStore((state) => state.canUndo);
+  const canRedo = useDesignEditorStore((state) => state.canRedo);
   const syncCurrentPageToProject = useProjectStore(
     (state) => state.syncCurrentPageToProject,
   );
@@ -62,6 +66,27 @@ export function ContextualToolbar() {
       </div>
 
       <div className="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-x-auto">
+        {mode === "designer" && selectedPage ? (
+          <>
+            <Button
+              variant="ghost"
+              disabled={!canUndo}
+              onClick={() => void canvasController?.undo()}
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={!canRedo}
+              onClick={() => void canvasController?.redo()}
+              title="Redo (Ctrl+Shift+Z)"
+            >
+              <Redo2 className="size-3.5" />
+            </Button>
+          </>
+        ) : null}
+
         {!selectedObject || mode === "template" || !selectedPage ? (
           <span className="font-body text-xs text-rm-neutral-500">
             A4 Portrait · 210 × 297 mm

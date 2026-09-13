@@ -67,8 +67,8 @@ export interface ObjectShadowMeta {
   color: string;
   opacity: number;
   blur: number;
-  offsetX: number;
-  offsetY: number;
+  distance: number;
+  angle: number;
   preset?: ShadowPreset;
 }
 

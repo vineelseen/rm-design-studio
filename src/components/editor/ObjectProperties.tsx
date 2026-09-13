@@ -168,6 +168,9 @@ function MultiSelectionPanel({
 export function ObjectProperties() {
   const selectedObject = useDesignEditorStore((state) => state.selectedObject);
   const canvasController = useDesignEditorStore((state) => state.canvasController);
+  const patchSelectedShadow = useDesignEditorStore(
+    (state) => state.patchSelectedShadow,
+  );
 
   const update = (updates: Partial<SelectedObjectMeta>) => {
     if (!selectedObject || !canvasController) return;
@@ -394,8 +397,12 @@ export function ObjectProperties() {
         </PanelSection>
       ) : null}
 
-      {supportsShadow ? (
-        <EffectControls selectedObject={selectedObject} update={update} />
+      {supportsShadow && canvasController ? (
+        <EffectControls
+          selectedObject={selectedObject}
+          canvasController={canvasController}
+          onShadowChange={patchSelectedShadow}
+        />
       ) : null}
 
       <TransformSection

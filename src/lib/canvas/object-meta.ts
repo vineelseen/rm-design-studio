@@ -9,6 +9,10 @@ import {
   Triangle,
 } from "fabric";
 
+import {
+  metaFromFabricShadow,
+  shadowMetaToFabric,
+} from "@/lib/canvas/shadow-utils";
 import type { ObjectShadowMeta, SelectedObjectMeta, SelectedObjectType } from "@/types/project";
 
 export type TaggedFabricObject = FabricObject & {
@@ -18,6 +22,7 @@ export type TaggedFabricObject = FabricObject & {
   rmUserLocked?: boolean;
   rmFilename?: string;
   rmName?: string;
+  rmShadow?: ObjectShadowMeta;
 };
 
 export const SERIALIZED_PROPERTIES = [
@@ -27,6 +32,7 @@ export const SERIALIZED_PROPERTIES = [
   "rmUserLocked",
   "rmFilename",
   "rmName",
+  "rmShadow",
   "selectable",
   "evented",
   "hasControls",
@@ -115,27 +121,21 @@ export function defaultLayerName(object: FabricObject): string {
   return labels[type] ?? "Object";
 }
 
-function shadowToMeta(object: FabricObject): ObjectShadowMeta | undefined {
-  const shadow = object.shadow;
-  if (!shadow) {
-    return { enabled: false, color: "#000000", opacity: 0.18, blur: 12, offsetX: 0, offsetY: 6 };
+export function readShadowMeta(object: FabricObject): ObjectShadowMeta {
+  const tagged = object as TaggedFabricObject;
+  if (tagged.rmShadow) {
+    return tagged.rmShadow;
   }
+  return metaFromFabricShadow(object.shadow);
+}
 
-  const color = typeof shadow.color === "string" ? shadow.color : "#000000";
-  const opacity =
-    color.startsWith("rgba")
-      ? Number(color.split(",")[3]?.replace(")", "") ?? 0.18)
-      : 0.18;
-
-  return {
-    enabled: true,
-    color: color.startsWith("rgba") ? "#000000" : color,
-    opacity,
-    blur: shadow.blur ?? 12,
-    offsetX: shadow.offsetX ?? 0,
-    offsetY: shadow.offsetY ?? 6,
-    preset: "custom",
-  };
+export function writeShadowMeta(
+  object: FabricObject,
+  meta: ObjectShadowMeta,
+): void {
+  const tagged = object as TaggedFabricObject;
+  tagged.rmShadow = meta;
+  object.set("shadow", shadowMetaToFabric(meta));
 }
 
 export function toMeta(object: FabricObject): SelectedObjectMeta {
@@ -174,7 +174,7 @@ export function toMeta(object: FabricObject): SelectedObjectMeta {
     name: tagged.rmName ?? defaultLayerName(object),
     locked: isUserLocked(object),
     visible: object.visible !== false,
-    shadow: shadowToMeta(object),
+    shadow: readShadowMeta(object),
   };
 
   if (object instanceof Rect) {

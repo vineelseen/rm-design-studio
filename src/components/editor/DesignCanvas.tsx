@@ -37,6 +37,10 @@ export function DesignCanvas() {
   );
   const setLayers = useDesignEditorStore((state) => state.setLayers);
   const setSnapGuides = useDesignEditorStore((state) => state.setSnapGuides);
+  const setHistoryState = useDesignEditorStore((state) => state.setHistoryState);
+  const patchSelectedShadow = useDesignEditorStore(
+    (state) => state.patchSelectedShadow,
+  );
   const canvasController = useDesignEditorStore((state) => state.canvasController);
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
   const selectedPageId = useProjectStore(
@@ -53,9 +57,14 @@ export function DesignCanvas() {
     controller.onSelectionChange(setSelectedObject);
     controller.onLayersChange(setLayers);
     controller.onGuidesChange(setSnapGuides);
+    controller.onHistoryChange(setHistoryState);
+    controller.onShadowChange((shadow) => {
+      if (shadow) patchSelectedShadow(shadow);
+    });
 
     const page = useProjectStore.getState().getSelectedPage();
     if (page) {
+      controller.setActivePageId(page.id);
       void controller.loadFromJSON(page.canvasJson);
     }
 
@@ -73,6 +82,8 @@ export function DesignCanvas() {
     setSelectedObject,
     setLayers,
     setSnapGuides,
+    setHistoryState,
+    patchSelectedShadow,
   ]);
 
   useEffect(() => {
@@ -94,8 +105,16 @@ export function DesignCanvas() {
     const page = useProjectStore.getState().getSelectedPage();
     if (!page || page.id !== selectedPageId) return;
 
+    controller.setActivePageId(page.id);
     void controller.loadFromJSON(page.canvasJson);
   }, [selectedPageId]);
+
+  useEffect(() => {
+    const controller = controllerRef.current;
+    if (controller) {
+      controller.setDisplayScale(displayScale);
+    }
+  }, [displayScale]);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -184,6 +203,22 @@ export function DesignCanvas() {
       if (mod && event.key === "[") {
         event.preventDefault();
         controller.sendBackward();
+        return;
+      }
+
+      if (mod && event.key.toLowerCase() === "z" && !event.shiftKey) {
+        event.preventDefault();
+        void controller.undo();
+        return;
+      }
+
+      if (
+        mod &&
+        (event.key.toLowerCase() === "y" ||
+          (event.key.toLowerCase() === "z" && event.shiftKey))
+      ) {
+        event.preventDefault();
+        void controller.redo();
         return;
       }
 

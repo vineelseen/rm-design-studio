@@ -1,18 +1,111 @@
 "use client";
 
+import { useCallback, useEffect, useRef } from "react";
+
 import { SHADOW_PRESETS } from "@/lib/canvas/shadow-utils";
+import type { CanvasController } from "@/lib/canvas-controller";
 import type { ObjectShadowMeta, SelectedObjectMeta } from "@/types/project";
 import { PanelSection } from "@/components/ui";
 
 type EffectControlsProps = {
   selectedObject: SelectedObjectMeta;
-  update: (updates: Partial<SelectedObjectMeta>) => void;
+  canvasController: CanvasController;
+  onShadowChange: (shadow: ObjectShadowMeta) => void;
 };
 
-export function EffectControls({ selectedObject, update }: EffectControlsProps) {
-  const shadow = selectedObject.shadow ?? SHADOW_PRESETS.none;
+function SliderField({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+  onGestureStart,
+  onGestureEnd,
+  suffix,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (value: number) => void;
+  onGestureStart: () => void;
+  onGestureEnd: () => void;
+  suffix?: string;
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="font-body text-sm font-semibold text-rm-neutral-700">
+          {label}
+        </span>
+        {suffix ? (
+          <span className="font-body text-xs text-rm-neutral-500">{suffix}</span>
+        ) : null}
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onPointerDown={onGestureStart}
+        onPointerUp={onGestureEnd}
+        onPointerCancel={onGestureEnd}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="w-full"
+      />
+      <input
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onFocus={onGestureStart}
+        onBlur={onGestureEnd}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="h-8 w-full rounded-sm border border-rm-neutral-300 px-2 font-body text-sm"
+      />
+    </div>
+  );
+}
 
-  const setShadow = (next: ObjectShadowMeta) => update({ shadow: next });
+export function EffectControls({
+  selectedObject,
+  canvasController,
+  onShadowChange,
+}: EffectControlsProps) {
+  const shadow = selectedObject.shadow ?? SHADOW_PRESETS.none;
+  const gestureActiveRef = useRef(false);
+
+  const beginGesture = useCallback(() => {
+    if (gestureActiveRef.current) return;
+    gestureActiveRef.current = true;
+    canvasController.beginShadowGesture();
+  }, [canvasController]);
+
+  const endGesture = useCallback(() => {
+    if (!gestureActiveRef.current) return;
+    gestureActiveRef.current = false;
+    canvasController.commitShadowGesture();
+  }, [canvasController]);
+
+  useEffect(() => {
+    return () => {
+      if (gestureActiveRef.current) {
+        gestureActiveRef.current = false;
+        canvasController.commitShadowGesture();
+      }
+    };
+  }, [canvasController]);
+
+  const applyShadowLive = (next: ObjectShadowMeta) => {
+    canvasController.applyShadowLive(next);
+    onShadowChange(next);
+  };
+
+  const opacityPercent = Math.round(shadow.opacity * 100);
 
   return (
     <PanelSection title="Effects">
@@ -23,13 +116,13 @@ export function EffectControls({ selectedObject, update }: EffectControlsProps) 
         <input
           type="checkbox"
           checked={shadow.enabled}
-          onChange={(event) =>
-            setShadow(
-              event.target.checked
-                ? { ...SHADOW_PRESETS.medium, enabled: true }
-                : { ...SHADOW_PRESETS.none, enabled: false },
-            )
-          }
+          onChange={(event) => {
+            const next = event.target.checked
+              ? { ...SHADOW_PRESETS.medium, enabled: true }
+              : { ...SHADOW_PRESETS.none, enabled: false };
+            canvasController.applyShadowCommit(next);
+            onShadowChange(next);
+          }}
         />
       </label>
 
@@ -40,7 +133,11 @@ export function EffectControls({ selectedObject, update }: EffectControlsProps) 
               <button
                 key={preset}
                 type="button"
-                onClick={() => setShadow(SHADOW_PRESETS[preset])}
+                onClick={() => {
+                  const next = SHADOW_PRESETS[preset];
+                  canvasController.applyShadowPreset(preset);
+                  onShadowChange(next);
+                }}
                 className={`rounded-sm border px-2 py-1 font-body text-xs capitalize ${
                   shadow.preset === preset
                     ? "border-rm-blue-600 bg-rm-blue-50 text-rm-blue-600"
@@ -54,93 +151,105 @@ export function EffectControls({ selectedObject, update }: EffectControlsProps) 
 
           <label className="block space-y-1">
             <span className="font-body text-sm font-semibold text-rm-neutral-700">
-              Shadow Color
+              Color
             </span>
-            <input
-              type="color"
-              value={shadow.color}
-              onChange={(event) =>
-                setShadow({ ...shadow, color: event.target.value, preset: "custom" })
-              }
-              className="h-8 w-full rounded-sm border border-rm-neutral-300"
-            />
-          </label>
-
-          <label className="block space-y-1">
-            <span className="font-body text-sm font-semibold text-rm-neutral-700">
-              Opacity
-            </span>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={shadow.opacity}
-              onChange={(event) =>
-                setShadow({
-                  ...shadow,
-                  opacity: Number(event.target.value),
-                  preset: "custom",
-                })
-              }
-              className="w-full"
-            />
-          </label>
-
-          <label className="block space-y-1">
-            <span className="font-body text-sm font-semibold text-rm-neutral-700">
-              Blur
-            </span>
-            <input
-              type="number"
-              value={shadow.blur}
-              onChange={(event) =>
-                setShadow({
-                  ...shadow,
-                  blur: Number(event.target.value),
-                  preset: "custom",
-                })
-              }
-              className="h-8 w-full rounded-sm border border-rm-neutral-300 px-2 font-body text-sm"
-            />
-          </label>
-
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block space-y-1">
-              <span className="font-body text-sm font-semibold text-rm-neutral-700">
-                X Offset
-              </span>
+            <div className="flex gap-2">
               <input
-                type="number"
-                value={shadow.offsetX}
+                type="color"
+                value={shadow.color}
+                onPointerDown={beginGesture}
+                onPointerUp={endGesture}
                 onChange={(event) =>
-                  setShadow({
+                  applyShadowLive({
                     ...shadow,
-                    offsetX: Number(event.target.value),
+                    color: event.target.value,
                     preset: "custom",
                   })
                 }
-                className="h-8 w-full rounded-sm border border-rm-neutral-300 px-2 font-body text-sm"
+                className="h-8 w-12 rounded-sm border border-rm-neutral-300"
               />
-            </label>
-            <label className="block space-y-1">
-              <span className="font-body text-sm font-semibold text-rm-neutral-700">
-                Y Offset
-              </span>
               <input
-                type="number"
-                value={shadow.offsetY}
+                type="text"
+                value={shadow.color}
+                onFocus={beginGesture}
+                onBlur={endGesture}
                 onChange={(event) =>
-                  setShadow({
+                  applyShadowLive({
                     ...shadow,
-                    offsetY: Number(event.target.value),
+                    color: event.target.value,
                     preset: "custom",
                   })
                 }
-                className="h-8 w-full rounded-sm border border-rm-neutral-300 px-2 font-body text-sm"
+                className="h-8 flex-1 rounded-sm border border-rm-neutral-300 px-2 font-body text-sm uppercase"
               />
-            </label>
-          </div>
+            </div>
+          </label>
+
+          <SliderField
+            label="Opacity"
+            value={opacityPercent}
+            min={0}
+            max={100}
+            onGestureStart={beginGesture}
+            onGestureEnd={endGesture}
+            suffix={`${opacityPercent}%`}
+            onChange={(value) =>
+              applyShadowLive({
+                ...shadow,
+                opacity: value / 100,
+                preset: "custom",
+              })
+            }
+          />
+
+          <SliderField
+            label="Blur"
+            value={shadow.blur}
+            min={0}
+            max={50}
+            onGestureStart={beginGesture}
+            onGestureEnd={endGesture}
+            onChange={(value) =>
+              applyShadowLive({
+                ...shadow,
+                blur: value,
+                preset: "custom",
+              })
+            }
+          />
+
+          <SliderField
+            label="Distance"
+            value={shadow.distance}
+            min={0}
+            max={50}
+            onGestureStart={beginGesture}
+            onGestureEnd={endGesture}
+            onChange={(value) =>
+              applyShadowLive({
+                ...shadow,
+                distance: value,
+                preset: "custom",
+              })
+            }
+          />
+
+          <SliderField
+            label="Angle"
+            value={Math.round(shadow.angle)}
+            min={0}
+            max={360}
+            onGestureStart={beginGesture}
+            onGestureEnd={endGesture}
+            suffix={`${Math.round(shadow.angle)}°`}
+            onChange={(value) =>
+              applyShadowLive({
+                ...shadow,
+                angle: value,
+                preset: "custom",
+              })
+            }
+          />
         </>
       ) : null}
     </PanelSection>
