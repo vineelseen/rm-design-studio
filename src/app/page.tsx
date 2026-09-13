@@ -1,5 +1,5 @@
-import { AppShell } from "@/components/layout";
+import { StudioRoot } from "@/components/editor/StudioRoot";
 
 export default function Home() {
-  return <AppShell />;
+  return <StudioRoot />;
 }

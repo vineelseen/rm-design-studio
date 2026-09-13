@@ -7,9 +7,11 @@ type BrochureEditorState = {
   project: BrochureProject;
   selectedPageIndex: number;
   updateCoverContent: (updates: Partial<CoverPageContent>) => void;
+  loadCoverProject: (projectName: string, content: CoverPageContent) => void;
+  getCoverContent: () => CoverPageContent;
 };
 
-export const useBrochureEditorStore = create<BrochureEditorState>((set) => ({
+export const useBrochureEditorStore = create<BrochureEditorState>((set, get) => ({
   project: INITIAL_BROCHURE_PROJECT,
   selectedPageIndex: 0,
   updateCoverContent: (updates) =>
@@ -35,4 +37,24 @@ export const useBrochureEditorStore = create<BrochureEditorState>((set) => ({
         },
       };
     }),
+  loadCoverProject: (projectName, content) =>
+    set((state) => ({
+      project: {
+        ...state.project,
+        projectName,
+        pages: state.project.pages.map((page, index) =>
+          index === state.selectedPageIndex && page.type === "cover"
+            ? { ...page, content }
+            : page,
+        ),
+      },
+    })),
+  getCoverContent: (): CoverPageContent => {
+    const state = get();
+    const page = state.project.pages[state.selectedPageIndex];
+    if (!page || page.type !== "cover") {
+      return INITIAL_BROCHURE_PROJECT.pages[0].content;
+    }
+    return page.content;
+  },
 }));

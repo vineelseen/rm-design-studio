@@ -1,9 +1,11 @@
 "use client";
 
 import { Field, InputField, PanelSection } from "@/components/ui";
-import { useBrochureEditorStore } from "@/store";
+import { useBrochureEditorStore, useDesignEditorStore } from "@/store";
+import { ObjectProperties } from "./ObjectProperties";
 
 export function PropertiesPanel() {
+  const mode = useDesignEditorStore((state) => state.mode);
   const selectedPageIndex = useBrochureEditorStore(
     (state) => state.selectedPageIndex,
   );
@@ -13,10 +15,6 @@ export function PropertiesPanel() {
   const updateCoverContent = useBrochureEditorStore(
     (state) => state.updateCoverContent,
   );
-
-  if (!coverContent) {
-    return null;
-  }
 
   return (
     <aside
@@ -29,41 +27,47 @@ export function PropertiesPanel() {
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
-        <PanelSection title="Page">
-          <Field label="Page type" value="Cover" />
-        </PanelSection>
+        {mode === "template" && coverContent ? (
+          <>
+            <PanelSection title="Page">
+              <Field label="Page type" value="Cover" />
+            </PanelSection>
 
-        <PanelSection title="Content">
-          <InputField
-            label="Eyebrow"
-            value={coverContent.eyebrow}
-            onChange={(value) => updateCoverContent({ eyebrow: value })}
-          />
-          <InputField
-            label="Product name"
-            value={coverContent.productName}
-            onChange={(value) => updateCoverContent({ productName: value })}
-          />
-          <InputField
-            label="Generation"
-            value={coverContent.generation}
-            onChange={(value) => updateCoverContent({ generation: value })}
-          />
-          <InputField
-            label="Subtitle"
-            value={coverContent.subtitle}
-            onChange={(value) => updateCoverContent({ subtitle: value })}
-          />
-          <InputField
-            label="Tagline"
-            value={coverContent.tagline}
-            onChange={(value) => updateCoverContent({ tagline: value })}
-          />
-        </PanelSection>
+            <PanelSection title="Content">
+              <InputField
+                label="Eyebrow"
+                value={coverContent.eyebrow}
+                onChange={(value) => updateCoverContent({ eyebrow: value })}
+              />
+              <InputField
+                label="Product name"
+                value={coverContent.productName}
+                onChange={(value) => updateCoverContent({ productName: value })}
+              />
+              <InputField
+                label="Generation"
+                value={coverContent.generation}
+                onChange={(value) => updateCoverContent({ generation: value })}
+              />
+              <InputField
+                label="Subtitle"
+                value={coverContent.subtitle}
+                onChange={(value) => updateCoverContent({ subtitle: value })}
+              />
+              <InputField
+                label="Tagline"
+                value={coverContent.tagline}
+                onChange={(value) => updateCoverContent({ tagline: value })}
+              />
+            </PanelSection>
 
-        <PanelSection title="Appearance" className="border-b-0 pb-0">
-          <Field label="Layout" value="Standard cover" />
-        </PanelSection>
+            <PanelSection title="Appearance" className="border-b-0 pb-0">
+              <Field label="Layout" value="Standard cover" />
+            </PanelSection>
+          </>
+        ) : (
+          <ObjectProperties />
+        )}
       </div>
     </aside>
   );
