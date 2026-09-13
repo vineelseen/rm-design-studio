@@ -39,7 +39,7 @@ export function A4Page({
   return (
     <article
       className={cn(
-        "relative shrink-0 bg-rm-white",
+        "relative @container/a4 shrink-0 bg-rm-white",
         "shadow-[0_1px_3px_rgba(23,29,40,0.06),0_0_1px_rgba(23,29,40,0.08)]",
         className,
       )}
