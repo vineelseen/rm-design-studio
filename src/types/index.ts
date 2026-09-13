@@ -5,6 +5,7 @@ export type {
 } from "./brochure";
 
 export type {
+  DesignPage,
   EditorMode,
   Project,
   ProjectFolder,

@@ -17,19 +17,17 @@ import { useDesignEditorStore, useProjectStore } from "@/store";
 
 export function ContextualToolbar() {
   const mode = useDesignEditorStore((state) => state.mode);
-  const setMode = useDesignEditorStore((state) => state.setMode);
   const selectedObject = useDesignEditorStore((state) => state.selectedObject);
   const canvasController = useDesignEditorStore((state) => state.canvasController);
-  const updateActiveProjectDraft = useProjectStore(
-    (state) => state.updateActiveProjectDraft,
+  const syncCurrentPageToProject = useProjectStore(
+    (state) => state.syncCurrentPageToProject,
   );
+  const setCurrentPageMode = useProjectStore((state) => state.setCurrentPageMode);
+  const selectedPage = useProjectStore((state) => state.getSelectedPage());
 
   const switchMode = (nextMode: "template" | "designer") => {
-    const json = canvasController?.toJSON();
-    if (json) {
-      updateActiveProjectDraft(json);
-    }
-    setMode(nextMode);
+    syncCurrentPageToProject();
+    setCurrentPageMode(nextMode);
   };
 
   const update = (updates: Parameters<NonNullable<typeof canvasController>["updateActiveObject"]>[0]) => {
@@ -64,7 +62,7 @@ export function ContextualToolbar() {
       </div>
 
       <div className="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-x-auto">
-        {!selectedObject || mode === "template" ? (
+        {!selectedObject || mode === "template" || !selectedPage ? (
           <span className="font-body text-xs text-rm-neutral-500">
             A4 Portrait · 210 × 297 mm
           </span>

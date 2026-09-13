@@ -1,4 +1,6 @@
 export { CreateDesignDialog } from "./CreateDesignDialog";
+export { ExportDialog } from "./ExportDialog";
+export { PagesPanel } from "./PagesPanel";
 export { DesignCanvas } from "./DesignCanvas";
 export { EditorBootstrap } from "./EditorBootstrap";
 export { ObjectProperties } from "./ObjectProperties";

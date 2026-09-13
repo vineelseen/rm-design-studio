@@ -3,6 +3,17 @@ import type { CoverPageContent } from "./brochure";
 export type ProjectTemplate = "blank" | "t501";
 export type EditorMode = "template" | "designer";
 
+export interface DesignPage {
+  id: string;
+  name: string;
+  pageNumber: number;
+  mode: EditorMode;
+  canvasJson: string | null;
+  templateId?: string;
+  coverContent?: CoverPageContent;
+  thumbnailDataUrl?: string;
+}
+
 export interface ProjectFolder {
   id: string;
   name: string;
@@ -14,11 +25,16 @@ export interface Project {
   name: string;
   folderId: string;
   template: ProjectTemplate;
-  canvasJson: string | null;
-  coverContent?: CoverPageContent;
-  editorMode?: EditorMode;
+  pages: DesignPage[];
+  selectedPageId: string;
   createdAt: string;
   updatedAt: string;
+  /** @deprecated migrated to pages[] */
+  canvasJson?: string | null;
+  /** @deprecated migrated to pages[] */
+  coverContent?: CoverPageContent;
+  /** @deprecated migrated to pages[] */
+  editorMode?: EditorMode;
 }
 
 export type ToolPanelId =

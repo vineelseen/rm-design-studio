@@ -1,4 +1,4 @@
-import type { Project, ProjectFolder, ProjectTemplate } from '@/types/project';
+import type { DesignPage, Project, ProjectFolder, ProjectTemplate } from '@/types/project';
 
 const PROJECTS_KEY = 'rm-design-studio:projects';
 const FOLDERS_KEY = 'rm-design-studio:folders';
@@ -39,6 +39,7 @@ export function createProject(
   name: string,
   folderId: string,
   template: ProjectTemplate = 'blank',
+  pages: DesignPage[],
 ): Project {
   const now = new Date().toISOString();
   return {
@@ -46,7 +47,8 @@ export function createProject(
     name: name.trim() || 'Untitled Design',
     folderId,
     template,
-    canvasJson: null,
+    pages,
+    selectedPageId: pages[0]?.id ?? '',
     createdAt: now,
     updatedAt: now,
   };

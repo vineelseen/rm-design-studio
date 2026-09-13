@@ -1,5 +1,4 @@
-import { PageListItem } from "@/components/editor/PageListItem";
-import { BROCHURE_PAGES, SELECTED_PAGE_INDEX } from "@/data/brochure-pages";
+import { PagesPanel } from "@/components/editor/PagesPanel";
 
 export function LeftSidebar() {
   return (
@@ -13,17 +12,7 @@ export function LeftSidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2" aria-label="Brochure pages">
-        <ul className="space-y-1">
-          {BROCHURE_PAGES.map((page, index) => (
-            <li key={`${page.number}-${page.title}`}>
-              <PageListItem
-                number={page.number}
-                title={page.title}
-                isSelected={index === SELECTED_PAGE_INDEX}
-              />
-            </li>
-          ))}
-        </ul>
+        <PagesPanel />
       </nav>
     </aside>
   );
