@@ -1,17 +1,13 @@
 "use client";
 
 import { Field, InputField, PanelSection } from "@/components/ui";
-import { useBrochureEditorStore, useDesignEditorStore } from "@/store";
+import { useBrochureEditorStore, useDesignEditorStore, useProjectStore } from "@/store";
 import { ObjectProperties } from "./ObjectProperties";
 
 export function PropertiesPanel() {
   const mode = useDesignEditorStore((state) => state.mode);
-  const selectedPageIndex = useBrochureEditorStore(
-    (state) => state.selectedPageIndex,
-  );
-  const coverContent = useBrochureEditorStore(
-    (state) => state.project.pages[selectedPageIndex]?.content,
-  );
+  const selectedPage = useProjectStore((state) => state.getSelectedPage());
+  const coverContent = useBrochureEditorStore((state) => state.getCoverContent());
   const updateCoverContent = useBrochureEditorStore(
     (state) => state.updateCoverContent,
   );
@@ -27,7 +23,7 @@ export function PropertiesPanel() {
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
-        {mode === "template" && coverContent ? (
+        {mode === "template" && selectedPage?.templateId === "t501" && coverContent ? (
           <>
             <PanelSection title="Page">
               <Field label="Page type" value="Cover" />

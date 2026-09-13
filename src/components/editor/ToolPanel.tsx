@@ -13,8 +13,7 @@ import {
 import { Button } from "@/components/ui";
 import { handleFilesUpload } from "@/lib/upload-utils";
 import { useDesignEditorStore, useProjectStore } from "@/store";
-import { BROCHURE_PAGES } from "@/data/brochure-pages";
-import { PageListItem } from "./PageListItem";
+import { PagesPanel } from "./PagesPanel";
 
 const BRAND_COLORS = [
   { name: "Rugged Blue", value: "#0F52BA" },
@@ -256,19 +255,7 @@ export function ToolPanel() {
           </div>
         ) : null}
 
-        {activePanel === "pages" ? (
-          <ul className="space-y-1">
-            {BROCHURE_PAGES.map((page, index) => (
-              <li key={`${page.number}-${page.title}`}>
-                <PageListItem
-                  number={page.number}
-                  title={page.title}
-                  isSelected={index === 0}
-                />
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        {activePanel === "pages" ? <PagesPanel /> : null}
 
         {activePanel === "projects" ? (
           <div className="space-y-3 font-body text-sm">

@@ -398,6 +398,22 @@ export class CanvasController {
     return JSON.stringify(this.canvas.toObject([...SERIALIZED_PROPERTIES]));
   }
 
+  exportThumbnail() {
+    return this.canvas.toDataURL({
+      format: "png",
+      multiplier: 0.2,
+      enableRetinaScaling: true,
+    });
+  }
+
+  exportHighResDataUrl(multiplier = 2.5) {
+    return this.canvas.toDataURL({
+      format: "png",
+      multiplier,
+      enableRetinaScaling: true,
+    });
+  }
+
   async loadFromJSON(json: string | null) {
     this.canvas.clear();
     this.canvas.backgroundColor = "#ffffff";

@@ -30,6 +30,11 @@ export function DesignCanvas() {
     setCanvasController(controller);
     controller.onSelectionChange(setSelectedObject);
 
+    const page = useProjectStore.getState().getSelectedPage();
+    if (page) {
+      void controller.loadFromJSON(page.canvasJson);
+    }
+
     return () => {
       controller.destroy();
       controllerRef.current = null;
@@ -44,14 +49,11 @@ export function DesignCanvas() {
     if (!controller || !activeProjectId) return;
     if (loadedProjectRef.current === activeProjectId) return;
 
-    const project = useProjectStore
-      .getState()
-      .projects.find((item) => item.id === activeProjectId);
-
-    if (!project) return;
+    const page = useProjectStore.getState().getSelectedPage();
+    if (!page) return;
 
     loadedProjectRef.current = activeProjectId;
-    void controller.loadFromJSON(project.canvasJson);
+    void controller.loadFromJSON(page.canvasJson);
   }, [activeProjectId]);
 
   useEffect(() => {
