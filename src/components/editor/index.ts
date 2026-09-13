@@ -1,6 +1,4 @@
-/**
- * Editor-specific components for RM Design Studio.
- * Reserved for the future brochure editor module.
- */
-
-export {};
+export { BrochureCanvasPlaceholder } from "./BrochureCanvasPlaceholder";
+export { PageListItem } from "./PageListItem";
+export { PropertiesPanel } from "./PropertiesPanel";
+export { Workspace } from "./Workspace";

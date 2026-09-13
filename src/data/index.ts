@@ -1,5 +1,5 @@
-/**
- * Static data, fixtures, and seed content for RM Design Studio.
- */
-
-export {};
+export {
+  BROCHURE_PAGES,
+  SELECTED_PAGE_INDEX,
+  type BrochurePage,
+} from "./brochure-pages";

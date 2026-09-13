@@ -1,6 +1,4 @@
-/**
- * Layout components for RM Design Studio.
- * Shell, navigation, and page structure components will live here.
- */
-
-export {};
+export { AppShell } from "./AppShell";
+export { LeftSidebar } from "./LeftSidebar";
+export { StatusBar } from "./StatusBar";
+export { TopBar } from "./TopBar";
