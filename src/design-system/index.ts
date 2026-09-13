@@ -22,3 +22,11 @@ export {
   radiusPrimitives,
   radiusSemantic,
 } from "./radius";
+
+export {
+  brochure,
+  brochureDocument,
+  brochureLayout,
+  SHOW_BROCHURE_GRID_OVERLAY,
+  type BrochureOrientation,
+} from "./brochure";
