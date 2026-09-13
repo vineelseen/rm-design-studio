@@ -2,9 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { IText } from "fabric";
+
 import { A4_ASPECT_RATIO, A4_CANVAS_HEIGHT, A4_CANVAS_WIDTH } from "@/lib/canvas-constants";
 import { CanvasController } from "@/lib/canvas-controller";
 import { useDesignEditorStore, useProjectStore } from "@/store";
+import { CanvasContextMenu } from "./CanvasContextMenu";
+import { SnapGuidesOverlay } from "./SnapGuidesOverlay";
+
+function isTypingTarget(target: EventTarget | null) {
+  const element = target as HTMLElement | null;
+  return (
+    element?.tagName === "INPUT" ||
+    element?.tagName === "TEXTAREA" ||
+    element?.isContentEditable
+  );
+}
 
 export function DesignCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -12,6 +25,9 @@ export function DesignCanvas() {
   const controllerRef = useRef<CanvasController | null>(null);
   const loadedProjectRef = useRef<string | null>(null);
   const [displayScale, setDisplayScale] = useState(0.8);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(
+    null,
+  );
 
   const setCanvasController = useDesignEditorStore(
     (state) => state.setCanvasController,
@@ -19,7 +35,13 @@ export function DesignCanvas() {
   const setSelectedObject = useDesignEditorStore(
     (state) => state.setSelectedObject,
   );
+  const setLayers = useDesignEditorStore((state) => state.setLayers);
+  const setSnapGuides = useDesignEditorStore((state) => state.setSnapGuides);
+  const canvasController = useDesignEditorStore((state) => state.canvasController);
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
+  const selectedPageId = useProjectStore(
+    (state) => state.getSelectedPage()?.id,
+  );
 
   useEffect(() => {
     const element = canvasRef.current;
@@ -29,6 +51,8 @@ export function DesignCanvas() {
     controllerRef.current = controller;
     setCanvasController(controller);
     controller.onSelectionChange(setSelectedObject);
+    controller.onLayersChange(setLayers);
+    controller.onGuidesChange(setSnapGuides);
 
     const page = useProjectStore.getState().getSelectedPage();
     if (page) {
@@ -40,9 +64,16 @@ export function DesignCanvas() {
       controllerRef.current = null;
       setCanvasController(null);
       setSelectedObject(null);
+      setLayers([]);
+      setSnapGuides([]);
       loadedProjectRef.current = null;
     };
-  }, [setCanvasController, setSelectedObject]);
+  }, [
+    setCanvasController,
+    setSelectedObject,
+    setLayers,
+    setSnapGuides,
+  ]);
 
   useEffect(() => {
     const controller = controllerRef.current;
@@ -55,6 +86,16 @@ export function DesignCanvas() {
     loadedProjectRef.current = activeProjectId;
     void controller.loadFromJSON(page.canvasJson);
   }, [activeProjectId]);
+
+  useEffect(() => {
+    const controller = controllerRef.current;
+    if (!controller || !selectedPageId) return;
+
+    const page = useProjectStore.getState().getSelectedPage();
+    if (!page || page.id !== selectedPageId) return;
+
+    void controller.loadFromJSON(page.canvasJson);
+  }, [selectedPageId]);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -76,16 +117,78 @@ export function DesignCanvas() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const isTyping =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.isContentEditable;
+      if (isTypingTarget(event.target)) return;
 
-      if (isTyping) return;
+      const controller = controllerRef.current;
+      if (!controller) return;
+
+      const active = controller.canvas.getActiveObject();
+      if (active instanceof IText && active.isEditing) return;
+
+      const mod = event.ctrlKey || event.metaKey;
+
+      if (mod && event.key.toLowerCase() === "g" && event.shiftKey) {
+        event.preventDefault();
+        void controller.ungroupSelected();
+        return;
+      }
+
+      if (mod && event.key.toLowerCase() === "g") {
+        event.preventDefault();
+        void controller.groupSelected();
+        return;
+      }
+
+      if (mod && event.key.toLowerCase() === "d") {
+        event.preventDefault();
+        void controller.duplicateSelected();
+        return;
+      }
+
+      if (mod && event.key.toLowerCase() === "c") {
+        event.preventDefault();
+        void controller.copySelected();
+        return;
+      }
+
+      if (mod && event.key.toLowerCase() === "v") {
+        event.preventDefault();
+        void controller.pasteClipboard();
+        return;
+      }
+
+      if (mod && event.key.toLowerCase() === "x") {
+        event.preventDefault();
+        void controller.cutSelected();
+        return;
+      }
+
+      if (mod && event.key === "]" && event.shiftKey) {
+        event.preventDefault();
+        controller.bringToFront();
+        return;
+      }
+
+      if (mod && event.key === "]") {
+        event.preventDefault();
+        controller.bringForward();
+        return;
+      }
+
+      if (mod && event.key === "[" && event.shiftKey) {
+        event.preventDefault();
+        controller.sendToBack();
+        return;
+      }
+
+      if (mod && event.key === "[") {
+        event.preventDefault();
+        controller.sendBackward();
+        return;
+      }
 
       if (event.key === "Delete" || event.key === "Backspace") {
-        controllerRef.current?.deleteSelected();
+        controller.deleteSelected();
       }
     };
 
@@ -97,6 +200,10 @@ export function DesignCanvas() {
     <div
       ref={wrapperRef}
       className="flex h-full w-full items-center justify-center"
+      onContextMenu={(event) => {
+        event.preventDefault();
+        setContextMenu({ x: event.clientX, y: event.clientY });
+      }}
     >
       <div
         className="relative bg-rm-white shadow-[0_1px_3px_rgba(23,29,40,0.06),0_0_1px_rgba(23,29,40,0.08)]"
@@ -107,6 +214,7 @@ export function DesignCanvas() {
         }}
       >
         <div
+          className="relative"
           style={{
             width: A4_CANVAS_WIDTH,
             height: A4_CANVAS_HEIGHT,
@@ -115,8 +223,15 @@ export function DesignCanvas() {
           }}
         >
           <canvas ref={canvasRef} />
+          <SnapGuidesOverlay />
         </div>
       </div>
+
+      <CanvasContextMenu
+        menu={contextMenu}
+        controller={canvasController}
+        onClose={() => setContextMenu(null)}
+      />
     </div>
   );
 }

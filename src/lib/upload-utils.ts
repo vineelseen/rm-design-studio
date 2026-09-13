@@ -1,15 +1,11 @@
 import type { CanvasController } from "@/lib/canvas-controller";
-import {
-  createUploadedAsset,
-  useDesignEditorStore,
-} from "@/store/design-editor-store";
+import { useUploadLibraryStore } from "@/store/upload-library-store";
 
 export async function handleFileUpload(
   file: File,
   canvasController: CanvasController | null,
+  addToCanvas = true,
 ) {
-  if (!canvasController) return;
-
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
   const isSvg = extension === "svg" || file.type === "image/svg+xml";
   const isRaster =
@@ -21,10 +17,15 @@ export async function handleFileUpload(
 
   if (isSvg) {
     const text = await file.text();
-    await canvasController.addSvgFromString(text, file.name);
-    useDesignEditorStore
-      .getState()
-      .addUploadedAsset(createUploadedAsset(file.name, `data:image/svg+xml;base64,${btoa(text)}`, "svg"));
+    const dataUrl = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(text)))}`;
+    useUploadLibraryStore.getState().addAsset({
+      name: file.name,
+      dataUrl,
+      type: "svg",
+    });
+    if (addToCanvas && canvasController) {
+      await canvasController.addSvgFromString(text, file.name);
+    }
     return;
   }
 
@@ -40,17 +41,23 @@ export async function handleFileUpload(
     reader.readAsDataURL(file);
   });
 
-  await canvasController.addImageFromDataUrl(dataUrl, file.name);
-  useDesignEditorStore
-    .getState()
-    .addUploadedAsset(createUploadedAsset(file.name, dataUrl, "image"));
+  useUploadLibraryStore.getState().addAsset({
+    name: file.name,
+    dataUrl,
+    type: "image",
+  });
+
+  if (addToCanvas && canvasController) {
+    await canvasController.addImageFromDataUrl(dataUrl, file.name);
+  }
 }
 
 export async function handleFilesUpload(
   files: FileList | File[],
   canvasController: CanvasController | null,
+  addToCanvas = true,
 ) {
   for (const file of Array.from(files)) {
-    await handleFileUpload(file, canvasController);
+    await handleFileUpload(file, canvasController, addToCanvas);
   }
 }

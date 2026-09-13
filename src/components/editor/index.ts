@@ -1,6 +1,10 @@
+export { CanvasContextMenu } from "./CanvasContextMenu";
 export { CreateDesignDialog } from "./CreateDesignDialog";
+export { EffectControls } from "./EffectControls";
 export { ExportDialog } from "./ExportDialog";
+export { LayersPanel } from "./LayersPanel";
 export { PagesPanel } from "./PagesPanel";
+export { UploadsPanel } from "./UploadsPanel";
 export { DesignCanvas } from "./DesignCanvas";
 export { EditorBootstrap } from "./EditorBootstrap";
 export { ObjectProperties } from "./ObjectProperties";

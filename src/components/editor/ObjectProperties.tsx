@@ -5,6 +5,9 @@ import { Field, InputField, PanelSection } from "@/components/ui";
 import { useDesignEditorStore } from "@/store";
 import type { SelectedObjectMeta } from "@/types/project";
 import { ColorControl } from "./ColorControl";
+import { EffectControls } from "./EffectControls";
+
+const CORNER_RADIUS_PRESETS = [0, 4, 8, 12, 16];
 
 function NumberField({
   label,
@@ -83,6 +86,85 @@ function TransformSection({
   );
 }
 
+function MultiSelectionPanel({
+  count,
+  canvasController,
+}: {
+  count: number;
+  canvasController: NonNullable<
+    ReturnType<typeof useDesignEditorStore.getState>["canvasController"]
+  >;
+}) {
+  return (
+    <>
+      <PanelSection title="Multiple Selection">
+        <Field label="Objects selected" value={String(count)} />
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            disabled={!canvasController.canGroup()}
+            onClick={() => void canvasController.groupSelected()}
+            className="rounded-sm border border-rm-neutral-300 px-2 py-1.5 font-body text-xs hover:bg-rm-neutral-50 disabled:opacity-50"
+          >
+            Group
+          </button>
+          <button
+            type="button"
+            onClick={() => canvasController.lockSelected()}
+            className="rounded-sm border border-rm-neutral-300 px-2 py-1.5 font-body text-xs hover:bg-rm-neutral-50"
+          >
+            Lock
+          </button>
+          <button
+            type="button"
+            onClick={() => canvasController.alignSelection("left")}
+            className="rounded-sm border border-rm-neutral-300 px-2 py-1.5 font-body text-xs hover:bg-rm-neutral-50"
+          >
+            Align Left
+          </button>
+          <button
+            type="button"
+            onClick={() => canvasController.alignSelection("center")}
+            className="rounded-sm border border-rm-neutral-300 px-2 py-1.5 font-body text-xs hover:bg-rm-neutral-50"
+          >
+            Align Center
+          </button>
+          <button
+            type="button"
+            disabled={!canvasController.canDistribute()}
+            onClick={() => canvasController.distributeSelection("horizontal")}
+            className="rounded-sm border border-rm-neutral-300 px-2 py-1.5 font-body text-xs hover:bg-rm-neutral-50 disabled:opacity-50"
+          >
+            Distribute H
+          </button>
+          <button
+            type="button"
+            disabled={!canvasController.canDistribute()}
+            onClick={() => canvasController.distributeSelection("vertical")}
+            className="rounded-sm border border-rm-neutral-300 px-2 py-1.5 font-body text-xs hover:bg-rm-neutral-50 disabled:opacity-50"
+          >
+            Distribute V
+          </button>
+          <button
+            type="button"
+            onClick={() => canvasController.bringForward()}
+            className="rounded-sm border border-rm-neutral-300 px-2 py-1.5 font-body text-xs hover:bg-rm-neutral-50"
+          >
+            Bring Forward
+          </button>
+          <button
+            type="button"
+            onClick={() => canvasController.sendBackward()}
+            className="rounded-sm border border-rm-neutral-300 px-2 py-1.5 font-body text-xs hover:bg-rm-neutral-50"
+          >
+            Send Backward
+          </button>
+        </div>
+      </PanelSection>
+    </>
+  );
+}
+
 export function ObjectProperties() {
   const selectedObject = useDesignEditorStore((state) => state.selectedObject);
   const canvasController = useDesignEditorStore((state) => state.canvasController);
@@ -101,10 +183,21 @@ export function ObjectProperties() {
     );
   }
 
-  const isShape =
+  if (selectedObject.isMultiSelect && canvasController) {
+    return (
+      <MultiSelectionPanel
+        count={selectedObject.selectionCount ?? 0}
+        canvasController={canvasController}
+      />
+    );
+  }
+
+  const supportsShadow =
+    selectedObject.type === "text" ||
     selectedObject.type === "rect" ||
     selectedObject.type === "circle" ||
-    selectedObject.type === "triangle";
+    selectedObject.type === "image" ||
+    selectedObject.type === "group";
 
   return (
     <>
@@ -178,7 +271,7 @@ export function ObjectProperties() {
         </PanelSection>
       ) : null}
 
-      {isShape ? (
+      {selectedObject.type === "rect" ? (
         <PanelSection title="Shape">
           <ColorControl
             label="Fill"
@@ -197,6 +290,37 @@ export function ObjectProperties() {
           />
           <label className="block space-y-1">
             <span className="font-body text-sm font-semibold leading-5 text-rm-neutral-700">
+              Corner Radius
+            </span>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={selectedObject.cornerRadius ?? 0}
+              onChange={(event) =>
+                update({ cornerRadius: Number(event.target.value) })
+              }
+              className="h-8 w-full rounded-sm border border-rm-neutral-300 px-2 font-body text-sm"
+            />
+            <div className="flex flex-wrap gap-1">
+              {CORNER_RADIUS_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => update({ cornerRadius: preset })}
+                  className={`rounded-sm border px-2 py-1 font-body text-xs ${
+                    selectedObject.cornerRadius === preset
+                      ? "border-rm-blue-600 bg-rm-blue-50 text-rm-blue-600"
+                      : "border-rm-neutral-300 text-rm-neutral-700"
+                  }`}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+          </label>
+          <label className="block space-y-1">
+            <span className="font-body text-sm font-semibold leading-5 text-rm-neutral-700">
               Opacity
             </span>
             <input
@@ -209,6 +333,26 @@ export function ObjectProperties() {
               className="w-full"
             />
           </label>
+        </PanelSection>
+      ) : null}
+
+      {selectedObject.type === "circle" || selectedObject.type === "triangle" ? (
+        <PanelSection title="Shape">
+          <ColorControl
+            label="Fill"
+            value={selectedObject.fill ?? "#0F52BA"}
+            onChange={(value) => update({ fill: value })}
+          />
+          <ColorControl
+            label="Stroke"
+            value={selectedObject.stroke ?? "#0F52BA"}
+            onChange={(value) => update({ stroke: value })}
+          />
+          <NumberField
+            label="Stroke width"
+            value={selectedObject.strokeWidth ?? 1}
+            onChange={(value) => update({ strokeWidth: value })}
+          />
         </PanelSection>
       ) : null}
 
@@ -227,7 +371,7 @@ export function ObjectProperties() {
         </PanelSection>
       ) : null}
 
-      {selectedObject.type === "image" || selectedObject.type === "group" ? (
+      {selectedObject.type === "image" ? (
         <PanelSection title="Image">
           <Field
             label="Filename"
@@ -236,10 +380,28 @@ export function ObjectProperties() {
         </PanelSection>
       ) : null}
 
+      {selectedObject.type === "group" ? (
+        <PanelSection title="Group">
+          <Field
+            label="Object count"
+            value={String(selectedObject.groupObjectCount ?? 0)}
+          />
+          <InputField
+            label="Name"
+            value={selectedObject.name ?? "Group"}
+            onChange={(value) => update({ name: value })}
+          />
+        </PanelSection>
+      ) : null}
+
+      {supportsShadow ? (
+        <EffectControls selectedObject={selectedObject} update={update} />
+      ) : null}
+
       <TransformSection
         selectedObject={selectedObject}
         update={update}
-        showOpacity={selectedObject.type !== "line" && !isShape}
+        showOpacity={selectedObject.type !== "line" && selectedObject.type !== "rect"}
       />
     </>
   );
