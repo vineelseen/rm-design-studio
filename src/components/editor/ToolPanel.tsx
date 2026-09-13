@@ -1,19 +1,18 @@
 "use client";
 
-import { useRef } from "react";
 import {
   Circle,
   FolderOpen,
   Minus,
   Square,
   Triangle,
-  Upload,
 } from "lucide-react";
 
 import { Button } from "@/components/ui";
-import { handleFilesUpload } from "@/lib/upload-utils";
 import { useDesignEditorStore, useProjectStore } from "@/store";
+import { LayersPanel } from "./LayersPanel";
 import { PagesPanel } from "./PagesPanel";
+import { UploadsPanel } from "./UploadsPanel";
 
 const BRAND_COLORS = [
   { name: "Rugged Blue", value: "#0F52BA" },
@@ -33,20 +32,12 @@ const BRAND_FONTS = [
 export function ToolPanel() {
   const activePanel = useDesignEditorStore((state) => state.activePanel);
   const canvasController = useDesignEditorStore((state) => state.canvasController);
-  const uploadedAssets = useDesignEditorStore((state) => state.uploadedAssets);
   const mode = useDesignEditorStore((state) => state.mode);
   const setMode = useDesignEditorStore((state) => state.setMode);
   const closeProject = useProjectStore((state) => state.closeProject);
   const activeProject = useProjectStore((state) => state.getActiveProject());
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!activePanel) return null;
-
-  const onUpload = async (files: FileList | null) => {
-    if (!files) return;
-    await handleFilesUpload(files, canvasController);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
 
   return (
     <aside
@@ -120,71 +111,9 @@ export function ToolPanel() {
           </div>
         ) : null}
 
-        {activePanel === "uploads" ? (
-          <div className="space-y-4">
-            <Button
-              variant="primary"
-              className="w-full"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload className="size-3.5" />
-              Upload files
-            </Button>
-            <div
-              className="rounded-sm border border-dashed border-rm-neutral-300 bg-rm-neutral-50 px-3 py-8 text-center font-body text-sm text-rm-neutral-500"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                void onUpload(e.dataTransfer.files);
-              }}
-            >
-              Drag and drop images here
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/svg+xml"
-              multiple
-              className="hidden"
-              onChange={(e) => void onUpload(e.target.files)}
-            />
-            {uploadedAssets.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2">
-                {uploadedAssets.map((asset) => (
-                  <button
-                    key={asset.id}
-                    type="button"
-                    onClick={() => {
-                      if (asset.type === "svg") {
-                        const svg = asset.dataUrl.startsWith("data:")
-                          ? decodeURIComponent(
-                              asset.dataUrl.replace(/^data:image\/svg\+xml[^,]*,/, ""),
-                            )
-                          : asset.dataUrl;
-                        void canvasController?.addSvgFromString(svg, asset.name);
-                      } else {
-                        void canvasController?.addImageFromDataUrl(asset.dataUrl, asset.name);
-                      }
-                    }}
-                    className="overflow-hidden rounded-sm border border-rm-neutral-200 hover:border-rm-blue-600"
-                  >
-                    {asset.type === "image" ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- session thumbnail previews use data URLs
-                      <img src={asset.dataUrl} alt={asset.name} className="aspect-square w-full object-cover" />
-                    ) : (
-                      <div className="flex aspect-square items-center justify-center bg-rm-neutral-50 font-body text-xs text-rm-neutral-500">
-                        SVG
-                      </div>
-                    )}
-                    <div className="truncate px-2 py-1 font-body text-[10px] text-rm-neutral-600">
-                      {asset.name}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+        {activePanel === "uploads" ? <UploadsPanel /> : null}
+
+        {activePanel === "layers" ? <LayersPanel /> : null}
 
         {activePanel === "shapes" ? (
           <div className="grid grid-cols-2 gap-2">

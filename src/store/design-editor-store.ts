@@ -3,9 +3,10 @@ import { create } from "zustand";
 import type { CanvasController } from "@/lib/canvas-controller";
 import type {
   EditorMode,
+  LayerItem,
   SelectedObjectMeta,
+  SnapGuide,
   ToolPanelId,
-  UploadedAsset,
 } from "@/types/project";
 
 export type EditorTool =
@@ -22,19 +23,17 @@ type DesignEditorState = {
   activePanel: ToolPanelId | null;
   canvasController: CanvasController | null;
   selectedObject: SelectedObjectMeta | null;
-  uploadedAssets: UploadedAsset[];
+  layers: LayerItem[];
+  snapGuides: SnapGuide[];
   setMode: (mode: EditorMode) => void;
   setActiveTool: (tool: EditorTool) => void;
   setActivePanel: (panel: ToolPanelId | null) => void;
   togglePanel: (panel: ToolPanelId) => void;
   setCanvasController: (controller: CanvasController | null) => void;
   setSelectedObject: (meta: SelectedObjectMeta | null) => void;
-  addUploadedAsset: (asset: UploadedAsset) => void;
+  setLayers: (layers: LayerItem[]) => void;
+  setSnapGuides: (guides: SnapGuide[]) => void;
 };
-
-function createAssetId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
 
 export const useDesignEditorStore = create<DesignEditorState>((set, get) => ({
   mode: "designer",
@@ -42,7 +41,8 @@ export const useDesignEditorStore = create<DesignEditorState>((set, get) => ({
   activePanel: "design",
   canvasController: null,
   selectedObject: null,
-  uploadedAssets: [],
+  layers: [],
+  snapGuides: [],
   setMode: (mode) => set({ mode }),
   setActiveTool: (tool) => set({ activeTool: tool }),
   setActivePanel: (panel) => set({ activePanel: panel }),
@@ -50,20 +50,6 @@ export const useDesignEditorStore = create<DesignEditorState>((set, get) => ({
     set({ activePanel: get().activePanel === panel ? null : panel }),
   setCanvasController: (controller) => set({ canvasController: controller }),
   setSelectedObject: (meta) => set({ selectedObject: meta }),
-  addUploadedAsset: (asset) =>
-    set({ uploadedAssets: [...get().uploadedAssets, asset] }),
+  setLayers: (layers) => set({ layers }),
+  setSnapGuides: (nextGuides) => set({ snapGuides: nextGuides }),
 }));
-
-export function createUploadedAsset(
-  name: string,
-  dataUrl: string,
-  type: "image" | "svg",
-): UploadedAsset {
-  return {
-    id: createAssetId(),
-    name,
-    dataUrl,
-    type,
-    createdAt: new Date().toISOString(),
-  };
-}

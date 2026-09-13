@@ -1,10 +1,11 @@
 "use client";
 
 import {
+  FileStack,
   FolderOpen,
   ImageIcon,
   LayoutTemplate,
-  Layers,
+  Layers3,
   Shapes,
   SwatchBook,
   Type,
@@ -19,7 +20,8 @@ const TOOLS: Array<{ id: ToolPanelId; label: string; icon: React.ReactNode }> = 
   { id: "uploads", label: "Uploads", icon: <ImageIcon className="size-4" aria-hidden="true" /> },
   { id: "shapes", label: "Shapes", icon: <Shapes className="size-4" /> },
   { id: "brand", label: "Brand", icon: <SwatchBook className="size-4" /> },
-  { id: "pages", label: "Pages", icon: <Layers className="size-4" /> },
+  { id: "layers", label: "Layers", icon: <Layers3 className="size-4" /> },
+  { id: "pages", label: "Pages", icon: <FileStack className="size-4" /> },
   { id: "projects", label: "Projects", icon: <FolderOpen className="size-4" /> },
 ];
 
