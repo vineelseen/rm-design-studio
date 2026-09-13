@@ -25,6 +25,7 @@ import {
   type AlignMode,
   type AlignPageMode,
 } from "@/lib/canvas/alignment";
+import { PageHistoryManager } from "@/lib/canvas/history";
 import {
   SERIALIZED_PROPERTIES,
   TaggedFabricObject,
@@ -33,13 +34,16 @@ import {
   isEditableObject,
   isSystemLocked,
   isUserLocked,
+  readShadowMeta,
   tagObject,
   toMeta,
+  writeShadowMeta,
 } from "@/lib/canvas/object-meta";
-import { snapMovingObject } from "@/lib/canvas/snapping";
-import { SHADOW_PRESETS, shadowMetaToFabric } from "@/lib/canvas/shadow-utils";
+import { clearSnapState, snapMovingObject } from "@/lib/canvas/snapping";
+import { SHADOW_PRESETS } from "@/lib/canvas/shadow-utils";
 import type {
   LayerItem,
+  ObjectShadowMeta,
   SelectedObjectMeta,
   SnapGuide,
 } from "@/types/project";
@@ -48,13 +52,22 @@ import { T501_ASSETS } from "@/components/brochure/templates/t501-assets";
 type SelectionListener = (meta: SelectedObjectMeta | null) => void;
 type LayersListener = (layers: LayerItem[]) => void;
 type GuidesListener = (guides: SnapGuide[]) => void;
+type HistoryListener = (state: { canUndo: boolean; canRedo: boolean }) => void;
+type ShadowListener = (shadow: ObjectShadowMeta | null) => void;
 
 export class CanvasController {
   readonly canvas: Canvas;
   private selectionListener: SelectionListener | null = null;
   private layersListener: LayersListener | null = null;
   private guidesListener: GuidesListener | null = null;
+  private historyListener: HistoryListener | null = null;
+  private shadowListener: ShadowListener | null = null;
   private clipboard: FabricObject[] | null = null;
+  private readonly history = new PageHistoryManager();
+  private activePageId: string | null = null;
+  private isRestoringHistory = false;
+  private displayScale = 1;
+  private shadowGestureActive = false;
 
   constructor(element: HTMLCanvasElement) {
     this.canvas = new Canvas(element, {
@@ -68,13 +81,27 @@ export class CanvasController {
     this.canvas.on("selection:created", () => this.emitSelection());
     this.canvas.on("selection:updated", () => this.emitSelection());
     this.canvas.on("selection:cleared", () => this.emitSelection());
-    this.canvas.on("object:modified", () => {
-      this.emitSelection();
-      this.emitLayers();
+    this.canvas.on("text:editing:entered", () => {
+      if (this.isRestoringHistory || !this.activePageId) return;
+      this.history.beginGesture(this.toJSON());
     });
+
+    this.canvas.on("text:editing:exited", () => {
+      if (this.isRestoringHistory || !this.activePageId) return;
+      this.history.commitGesture(this.activePageId, this.toJSON());
+      this.emitHistory();
+    });
+
     this.canvas.on("text:changed", () => this.emitSelection());
     this.canvas.on("object:added", () => this.emitLayers());
     this.canvas.on("object:removed", () => this.emitLayers());
+
+    this.canvas.on("mouse:down", (event) => {
+      const target = event.target;
+      if (!target || !isEditableObject(target) || isUserLocked(target)) return;
+      if (this.isRestoringHistory || !this.activePageId) return;
+      this.history.beginGesture(this.toJSON());
+    });
 
     this.canvas.on("object:moving", (event) => {
       const target = event.target;
@@ -82,11 +109,25 @@ export class CanvasController {
       const guides = snapMovingObject(
         target,
         this.canvas.getObjects(),
+        this.displayScale,
       );
       this.guidesListener?.(guides);
     });
 
-    this.canvas.on("mouse:up", () => this.guidesListener?.([]));
+    this.canvas.on("mouse:up", (event) => {
+      const target = event.target;
+      if (target) clearSnapState(target);
+      this.guidesListener?.([]);
+    });
+
+    this.canvas.on("object:modified", () => {
+      if (!this.isRestoringHistory && this.activePageId) {
+        this.history.commitGesture(this.activePageId, this.toJSON());
+      }
+      this.emitSelection();
+      this.emitLayers();
+      this.emitHistory();
+    });
   }
 
   destroy() {
@@ -105,6 +146,75 @@ export class CanvasController {
 
   onGuidesChange(listener: GuidesListener) {
     this.guidesListener = listener;
+  }
+
+  onHistoryChange(listener: HistoryListener) {
+    this.historyListener = listener;
+    this.emitHistory();
+  }
+
+  onShadowChange(listener: ShadowListener) {
+    this.shadowListener = listener;
+  }
+
+  setDisplayScale(scale: number) {
+    this.displayScale = scale > 0 ? scale : 1;
+  }
+
+  setActivePageId(pageId: string | null) {
+    this.activePageId = pageId;
+    this.history.setActivePage(pageId);
+    this.emitHistory();
+  }
+
+  canUndo(): boolean {
+    return this.history.canUndo(this.activePageId);
+  }
+
+  canRedo(): boolean {
+    return this.history.canRedo(this.activePageId);
+  }
+
+  private emitHistory() {
+    this.historyListener?.({
+      canUndo: this.canUndo(),
+      canRedo: this.canRedo(),
+    });
+  }
+
+  private recordHistoryBeforeChange() {
+    if (this.isRestoringHistory || !this.activePageId) return;
+    this.history.pushSnapshot(this.activePageId, this.toJSON());
+  }
+
+  async undo() {
+    if (!this.activePageId || !this.canUndo()) return;
+    const current = this.toJSON();
+    const previous = this.history.undo(this.activePageId, current);
+    if (!previous) return;
+    await this.restoreSnapshot(previous);
+  }
+
+  async redo() {
+    if (!this.activePageId || !this.canRedo()) return;
+    const current = this.toJSON();
+    const next = this.history.redo(this.activePageId, current);
+    if (!next) return;
+    await this.restoreSnapshot(next);
+  }
+
+  private async restoreSnapshot(json: string) {
+    this.isRestoringHistory = true;
+    try {
+      await this.loadFromJSON(json, { skipHistory: true });
+      this.canvas.discardActiveObject();
+      this.canvas.requestRenderAll();
+      this.emitSelection();
+      this.emitLayers();
+    } finally {
+      this.isRestoringHistory = false;
+      this.emitHistory();
+    }
   }
 
   private emitSelection() {
@@ -153,11 +263,13 @@ export class CanvasController {
   }
 
   private addAndSelect(object: FabricObject) {
+    this.recordHistoryBeforeChange();
     this.canvas.add(object);
     this.canvas.setActiveObject(object);
     this.preserveLockedBackgrounds();
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitSelection();
+    this.emitHistory();
   }
 
   private getActiveObjects(): FabricObject[] {
@@ -180,32 +292,39 @@ export class CanvasController {
   setLayerVisibility(id: string, visible: boolean) {
     const object = this.findObjectById(id);
     if (!object) return;
+    this.recordHistoryBeforeChange();
     object.set("visible", visible);
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitLayers();
     this.emitSelection();
+    this.emitHistory();
   }
 
   setLayerLocked(id: string, locked: boolean) {
     const object = this.findObjectById(id);
     if (!object || isSystemLocked(object)) return;
+    this.recordHistoryBeforeChange();
     this.applyLockState(object, locked);
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitLayers();
     this.emitSelection();
+    this.emitHistory();
   }
 
   renameLayer(id: string, name: string) {
     const object = this.findObjectById(id);
     if (!object) return;
+    this.recordHistoryBeforeChange();
     (object as TaggedFabricObject).rmName = name.trim() || defaultLayerName(object);
     this.emitLayers();
     this.emitSelection();
+    this.emitHistory();
   }
 
   moveLayer(id: string, direction: "forward" | "backward" | "front" | "back") {
     const object = this.findObjectById(id);
     if (!object || isSystemLocked(object)) return;
+    this.recordHistoryBeforeChange();
 
     switch (direction) {
       case "forward":
@@ -223,8 +342,9 @@ export class CanvasController {
     }
 
     this.preserveLockedBackgrounds();
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitLayers();
+    this.emitHistory();
   }
 
   private applyLockState(object: FabricObject, locked: boolean) {
@@ -405,6 +525,7 @@ export class CanvasController {
   }
 
   applyBrandColor(color: string) {
+    this.recordHistoryBeforeChange();
     const objects = this.getActiveObjects();
     objects.forEach((active) => {
       if (isUserLocked(active)) return;
@@ -413,19 +534,22 @@ export class CanvasController {
       else active.set({ fill: color, stroke: color });
       active.setCoords();
     });
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitSelection();
+    this.emitHistory();
   }
 
   applyBrandFont(fontFamily: string) {
+    this.recordHistoryBeforeChange();
     this.getActiveObjects().forEach((active) => {
       if (active instanceof IText && !isUserLocked(active)) {
         active.set("fontFamily", fontFamily);
         active.setCoords();
       }
     });
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitSelection();
+    this.emitHistory();
   }
 
   async groupSelected() {
@@ -434,6 +558,7 @@ export class CanvasController {
     const objects = active.getObjects().filter(isEditableObject);
     if (objects.length < 2) return;
 
+    this.recordHistoryBeforeChange();
     this.canvas.discardActiveObject();
     objects.forEach((object) => this.canvas.remove(object));
 
@@ -446,6 +571,7 @@ export class CanvasController {
   async ungroupSelected() {
     const active = this.canvas.getActiveObject();
     if (!active || active.type !== "group" || active instanceof ActiveSelection) return;
+    this.recordHistoryBeforeChange();
     const group = active as Group;
     const items = group.removeAll();
     this.canvas.remove(group);
@@ -462,38 +588,47 @@ export class CanvasController {
     }
 
     this.preserveLockedBackgrounds();
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitSelection();
+    this.emitHistory();
   }
 
   toggleLockSelected() {
     const objects = this.getActiveObjects();
     if (objects.length === 0) return;
+    this.recordHistoryBeforeChange();
     const shouldLock = !objects.every(isUserLocked);
     objects.forEach((object) => this.applyLockState(object, shouldLock));
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitSelection();
+    this.emitHistory();
   }
 
   lockSelected() {
+    this.recordHistoryBeforeChange();
     this.getActiveObjects().forEach((object) => this.applyLockState(object, true));
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitSelection();
+    this.emitHistory();
   }
 
   unlockSelected() {
+    this.recordHistoryBeforeChange();
     this.getActiveObjects().forEach((object) => this.applyLockState(object, false));
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitSelection();
+    this.emitHistory();
   }
 
   deleteSelected() {
     const objects = this.getActiveObjects();
     if (objects.length === 0) return;
+    this.recordHistoryBeforeChange();
     objects.forEach((object) => this.canvas.remove(object));
     this.canvas.discardActiveObject();
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitSelection();
+    this.emitHistory();
   }
 
   bringForward() {
@@ -517,6 +652,7 @@ export class CanvasController {
   ) {
     const objects = this.getActiveObjects();
     if (objects.length === 0) return;
+    this.recordHistoryBeforeChange();
 
     const ordered =
       direction === "backward" || direction === "back"
@@ -542,13 +678,15 @@ export class CanvasController {
     });
 
     this.preserveLockedBackgrounds();
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitLayers();
+    this.emitHistory();
   }
 
   async duplicateSelected() {
     const objects = this.getActiveObjects();
     if (objects.length === 0) return;
+    this.recordHistoryBeforeChange();
 
     const clones = await Promise.all(
       objects.map(async (object) => {
@@ -564,6 +702,9 @@ export class CanvasController {
         target.rmName = source.rmName
           ? `${source.rmName} Copy`
           : defaultLayerName(clone);
+        target.rmShadow = source.rmShadow
+          ? { ...source.rmShadow }
+          : undefined;
         ensureObjectId(clone);
         return clone;
       }),
@@ -578,8 +719,9 @@ export class CanvasController {
     }
 
     this.preserveLockedBackgrounds();
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitSelection();
+    this.emitHistory();
   }
 
   async copySelected() {
@@ -595,6 +737,7 @@ export class CanvasController {
 
   async pasteClipboard() {
     if (!this.clipboard?.length) return;
+    this.recordHistoryBeforeChange();
 
     const clones = await Promise.all(
       this.clipboard.map(async (object) => {
@@ -617,26 +760,33 @@ export class CanvasController {
     }
 
     this.preserveLockedBackgrounds();
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitSelection();
+    this.emitHistory();
   }
 
   alignSelection(mode: AlignMode) {
+    this.recordHistoryBeforeChange();
     alignObjects(this.getActiveObjects(), mode);
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitSelection();
+    this.emitHistory();
   }
 
   alignSelectionToPage(mode: AlignPageMode) {
+    this.recordHistoryBeforeChange();
     this.getActiveObjects().forEach((object) => alignObjectToPage(object, mode));
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitSelection();
+    this.emitHistory();
   }
 
   distributeSelection(direction: "horizontal" | "vertical") {
+    this.recordHistoryBeforeChange();
     distributeObjects(this.getActiveObjects(), direction);
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitSelection();
+    this.emitHistory();
   }
 
   canGroup(): boolean {
@@ -662,9 +812,16 @@ export class CanvasController {
     return objects.length > 0 && objects.every(isUserLocked);
   }
 
-  updateActiveObject(updates: Partial<SelectedObjectMeta>) {
+  updateActiveObject(
+    updates: Partial<SelectedObjectMeta>,
+    options?: { skipHistory?: boolean },
+  ) {
     const active = this.canvas.getActiveObject();
     if (!active || isSystemLocked(active)) return;
+
+    if (!options?.skipHistory && !updates.shadow) {
+      this.recordHistoryBeforeChange();
+    }
 
     const targets = active instanceof ActiveSelection
       ? active.getObjects().filter((object) => !isUserLocked(object))
@@ -700,7 +857,7 @@ export class CanvasController {
       }
 
       if (updates.shadow) {
-        object.set("shadow", shadowMetaToFabric(updates.shadow));
+        writeShadowMeta(object, updates.shadow);
       }
 
       if (updates.width !== undefined || updates.height !== undefined) {
@@ -716,13 +873,61 @@ export class CanvasController {
       object.setCoords();
     });
 
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitSelection();
+    if (!options?.skipHistory) {
+      this.emitHistory();
+    }
+  }
+
+  beginShadowGesture() {
+    if (this.shadowGestureActive) return;
+    this.shadowGestureActive = true;
+    this.history.beginGesture(this.toJSON());
+  }
+
+  applyShadowLive(meta: ObjectShadowMeta) {
+    const active = this.canvas.getActiveObject();
+    if (!active || isSystemLocked(active)) return;
+
+    const targets = active instanceof ActiveSelection
+      ? active.getObjects().filter((object) => !isUserLocked(object))
+      : isUserLocked(active)
+        ? []
+        : [active];
+
+    targets.forEach((object) => {
+      writeShadowMeta(object, meta);
+      object.setCoords();
+    });
+
+    this.canvas.requestRenderAll();
+    this.shadowListener?.(meta);
+  }
+
+  commitShadowGesture() {
+    if (!this.shadowGestureActive) return;
+    this.shadowGestureActive = false;
+    if (this.activePageId) {
+      this.history.commitGesture(this.activePageId, this.toJSON());
+    }
+    this.emitSelection();
+    this.emitHistory();
+  }
+
+  applyShadowCommit(meta: ObjectShadowMeta) {
+    this.recordHistoryBeforeChange();
+    this.applyShadowLive(meta);
+    this.emitSelection();
+    this.emitHistory();
   }
 
   applyShadowPreset(preset: keyof typeof SHADOW_PRESETS) {
     const meta = SHADOW_PRESETS[preset];
-    this.updateActiveObject({ shadow: meta });
+    this.recordHistoryBeforeChange();
+    this.applyShadowLive(meta);
+    this.emitSelection();
+    this.emitHistory();
   }
 
   toJSON() {
@@ -745,12 +950,23 @@ export class CanvasController {
     });
   }
 
-  async loadFromJSON(json: string | null) {
+  async loadFromJSON(
+    json: string | null,
+    options?: { skipHistory?: boolean },
+  ) {
+    const wasRestoring = this.isRestoringHistory;
+    if (options?.skipHistory) {
+      this.isRestoringHistory = true;
+    }
+
     this.canvas.clear();
     this.canvas.backgroundColor = "#ffffff";
     if (!json) {
-      this.canvas.renderAll();
+      this.canvas.requestRenderAll();
       this.emitSelection();
+      if (options?.skipHistory) {
+        this.isRestoringHistory = wasRestoring;
+      }
       return;
     }
     await this.canvas.loadFromJSON(JSON.parse(json));
@@ -759,9 +975,18 @@ export class CanvasController {
       if (isUserLocked(object)) {
         this.applyLockState(object, true);
       }
+      const tagged = object as TaggedFabricObject;
+      if (tagged.rmShadow) {
+        writeShadowMeta(object, tagged.rmShadow);
+      } else if (object.shadow) {
+        tagged.rmShadow = readShadowMeta(object);
+      }
     });
-    this.canvas.renderAll();
+    this.canvas.requestRenderAll();
     this.emitSelection();
+    if (options?.skipHistory) {
+      this.isRestoringHistory = wasRestoring;
+    }
   }
 
   async applyTemplateBackground() {
