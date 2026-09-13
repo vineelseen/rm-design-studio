@@ -2,6 +2,7 @@ import Image from "next/image";
 
 import { colors, typeRoles } from "@/design-system";
 import { brochureLayout } from "@/design-system/brochure";
+import type { CoverPageContent } from "@/types/brochure";
 import { T501_ASSETS } from "./t501-assets";
 
 const { outerMarginMm } = brochureLayout;
@@ -15,7 +16,11 @@ const fullBleedStyle = {
   height: `calc(100% + ${outerMarginMm * 2}mm)`,
 } as const;
 
-function ProductEyebrow() {
+type T501CoverProps = {
+  content: CoverPageContent;
+};
+
+function ProductEyebrow({ value }: { value: string }) {
   const role = typeRoles.uiEyebrow;
 
   return (
@@ -31,7 +36,7 @@ function ProductEyebrow() {
           color: brand.primary,
         }}
       >
-        Product Brochure
+        {value}
       </p>
       <div
         className="mt-[0.6cqw]"
@@ -47,7 +52,13 @@ function ProductEyebrow() {
   );
 }
 
-function ProductTitle() {
+function ProductTitle({
+  productName,
+  generation,
+}: {
+  productName: string;
+  generation: string;
+}) {
   const h1 = typeRoles.headingH1;
 
   return (
@@ -62,7 +73,7 @@ function ProductTitle() {
           color: text.primary,
         }}
       >
-        T501
+        {productName}
       </h1>
       <span
         style={{
@@ -75,13 +86,13 @@ function ProductTitle() {
           marginBottom: "0.8cqw",
         }}
       >
-        Gen2
+        {generation}
       </span>
     </div>
   );
 }
 
-function ProductSubtitle() {
+function ProductSubtitle({ value }: { value: string }) {
   const body = typeRoles.bodyLarge;
 
   return (
@@ -97,21 +108,25 @@ function ProductSubtitle() {
         color: brand.primary,
       }}
     >
-      Advanced Monitoring System
+      {value}
     </p>
   );
 }
 
-function BottomTagline() {
+function BottomTagline({ value }: { value: string }) {
   const caption = typeRoles.uiCaption;
+  const parts = value
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean);
 
   return (
     <div
       className="flex items-center justify-center gap-[2cqw] py-[1.1cqw]"
       style={{ width: "66.7%" }}
     >
-      {["Rugged", "Robust", "Reliable"].map((word, index) => (
-        <span key={word} className="flex items-center gap-[2cqw]">
+      {parts.map((part, index) => (
+        <span key={`${part}-${index}`} className="flex items-center gap-[2cqw]">
           <span
             style={{
               fontFamily: "var(--font-display)",
@@ -123,9 +138,9 @@ function BottomTagline() {
               color: text.inverse,
             }}
           >
-            {word}
+            {part}
           </span>
-          {index < 2 ? (
+          {index < parts.length - 1 ? (
             <span
               style={{
                 fontFamily: "var(--font-body)",
@@ -143,13 +158,12 @@ function BottomTagline() {
   );
 }
 
-export function T501Cover() {
+export function T501Cover({ content }: T501CoverProps) {
   return (
     <div
       className="relative col-span-12 min-h-full overflow-hidden"
       style={fullBleedStyle}
     >
-      {/* Approved composite cover background */}
       <Image
         src={T501_ASSETS.coverBackground}
         alt=""
@@ -160,7 +174,6 @@ export function T501Cover() {
         aria-hidden="true"
       />
 
-      {/* Live text and logo overlay */}
       <div className="relative z-10 flex h-full min-h-full flex-col">
         <div
           style={{
@@ -186,13 +199,16 @@ export function T501Cover() {
             maxWidth: "62cqw",
           }}
         >
-          <ProductEyebrow />
-          <ProductTitle />
-          <ProductSubtitle />
+          <ProductEyebrow value={content.eyebrow} />
+          <ProductTitle
+            productName={content.productName}
+            generation={content.generation}
+          />
+          <ProductSubtitle value={content.subtitle} />
         </div>
 
         <div className="mt-auto">
-          <BottomTagline />
+          <BottomTagline value={content.tagline} />
         </div>
       </div>
     </div>

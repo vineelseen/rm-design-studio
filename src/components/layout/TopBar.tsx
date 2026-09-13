@@ -1,8 +1,13 @@
+"use client";
+
 import { Download, Eye, Save } from "lucide-react";
 
 import { Button } from "@/components/ui";
+import { useBrochureEditorStore } from "@/store";
 
 export function TopBar() {
+  const projectName = useBrochureEditorStore((state) => state.project.projectName);
+
   return (
     <header
       className="relative col-span-full flex h-12 shrink-0 items-center justify-between border-b border-rm-neutral-200 bg-rm-white px-4"
@@ -20,7 +25,7 @@ export function TopBar() {
 
       <div className="absolute left-1/2 -translate-x-1/2">
         <span className="font-body text-sm font-semibold leading-5 text-rm-neutral-700">
-          Untitled Brochure
+          {projectName}
         </span>
       </div>
 
