@@ -1,43 +1,70 @@
-import type { CoverPageContent } from "@/types/brochure";
+import type { CoverPageContent } from "./brochure";
 
-export type Folder = {
-  id: string;
-  name: string;
-};
-
+export type ProjectTemplate = "blank" | "t501";
 export type EditorMode = "template" | "designer";
 
-export type DesignerProject = {
+export interface ProjectFolder {
   id: string;
   name: string;
-  folderId: string | null;
+  createdAt: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  folderId: string;
+  template: ProjectTemplate;
+  canvasJson: string | null;
+  coverContent?: CoverPageContent;
+  editorMode?: EditorMode;
+  createdAt: string;
   updatedAt: string;
-  canvasJSON: string | null;
-  coverContent: CoverPageContent;
-  editorMode: EditorMode;
-};
+}
+
+export type ToolPanelId =
+  | "design"
+  | "text"
+  | "uploads"
+  | "shapes"
+  | "brand"
+  | "pages"
+  | "projects"
+  | null;
+
+export interface UploadedAsset {
+  id: string;
+  name: string;
+  dataUrl: string;
+  type: "image" | "svg";
+  createdAt: string;
+}
 
 export type SelectedObjectType =
   | "text"
   | "rect"
   | "circle"
+  | "triangle"
   | "line"
   | "image"
   | "group"
+  | "square"
   | "unknown";
 
-export type SelectedObjectMeta = {
+export interface SelectedObjectMeta {
   type: SelectedObjectType;
   left: number;
   top: number;
   width: number;
   height: number;
   angle: number;
+  opacity: number;
   fill?: string;
   stroke?: string;
+  strokeWidth?: number;
+  text?: string;
   fontFamily?: string;
   fontSize?: number;
   fontWeight?: string | number;
   textAlign?: string;
-  text?: string;
-};
+  filename?: string;
+}

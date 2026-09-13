@@ -1,183 +1,169 @@
 import { create } from "zustand";
 
+import { INITIAL_BROCHURE_PROJECT } from "@/data/initial-brochure-project";
 import {
+  createProject as createProjectRecord,
+  deleteProject as deleteProjectRecord,
   loadFolders,
   loadProjects,
   saveFolders,
   saveProjects,
+  upsertProject,
 } from "@/lib/project-storage";
-import { INITIAL_BROCHURE_PROJECT } from "@/data/initial-brochure-project";
-import { useBrochureEditorStore } from "@/store/brochure-editor-store";
-import { useDesignEditorStore } from "@/store/design-editor-store";
 import type { CoverPageContent } from "@/types/brochure";
-import type { DesignerProject, EditorMode, Folder } from "@/types/project";
+import type {
+  EditorMode,
+  Project,
+  ProjectFolder,
+  ProjectTemplate,
+} from "@/types/project";
 
-type ProjectStoreState = {
-  folders: Folder[];
-  projects: DesignerProject[];
-  activeProjectId: string | null;
-  view: "manager" | "editor";
-  savedMessage: string | null;
-  loadFromStorage: () => void;
-  createFolder: (name: string) => void;
-  renameFolder: (folderId: string, name: string) => void;
-  createProject: (name: string, folderId: string | null) => string;
-  openProject: (projectId: string) => void;
-  closeProject: () => void;
-  deleteProject: (projectId: string) => void;
-  moveProjectToFolder: (projectId: string, folderId: string | null) => void;
-  saveActiveProject: (payload: {
-    canvasJSON: string | null;
-    coverContent: CoverPageContent;
-    editorMode: EditorMode;
-  }) => void;
-  updateActiveProjectDraft: (canvasJSON: string) => void;
-  setSavedMessage: (message: string | null) => void;
-  getActiveProject: () => DesignerProject | null;
+const SEED_FOLDERS: ProjectFolder[] = [
+  { id: "folder-product", name: "Product Brochures", createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "folder-solution", name: "Solution Brochures", createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "folder-social", name: "Social Media", createdAt: "2026-01-01T00:00:00.000Z" },
+];
+
+const DEFAULT_COVER = INITIAL_BROCHURE_PROJECT.pages[0].content;
+
+type SavePayload = {
+  canvasJson: string | null;
+  coverContent?: CoverPageContent;
+  editorMode?: EditorMode;
 };
 
-function createId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+interface ProjectState {
+  projects: Project[];
+  folders: ProjectFolder[];
+  activeProjectId: string | null;
+  hydrated: boolean;
+  savedMessage: string | null;
+  hydrate: () => void;
+  createFolder: (name: string) => ProjectFolder;
+  createProject: (name: string, folderId: string, template: ProjectTemplate) => Project;
+  openProject: (id: string) => void;
+  closeProject: () => void;
+  saveActiveProject: (payload: SavePayload) => void;
+  updateActiveProjectDraft: (canvasJson: string) => void;
+  deleteProject: (id: string) => void;
+  getActiveProject: () => Project | null;
+  getFolderName: (folderId: string) => string;
 }
 
-export const useProjectStore = create<ProjectStoreState>((set, get) => ({
-  folders: [],
+function ensureSeedFolders(folders: ProjectFolder[]): ProjectFolder[] {
+  if (folders.length > 0) return folders;
+  saveFolders(SEED_FOLDERS);
+  return SEED_FOLDERS;
+}
+
+function normalizeProject(raw: Project & { canvasJSON?: string | null }): Project {
+  return {
+    ...raw,
+    canvasJson: raw.canvasJson ?? raw.canvasJSON ?? null,
+    template: raw.template ?? "blank",
+    folderId: raw.folderId || SEED_FOLDERS[0].id,
+    coverContent: raw.coverContent ?? (raw.template === "t501" ? DEFAULT_COVER : undefined),
+  };
+}
+
+export const useProjectStore = create<ProjectState>((set, get) => ({
   projects: [],
+  folders: [],
   activeProjectId: null,
-  view: "manager",
+  hydrated: false,
   savedMessage: null,
 
-  loadFromStorage: () => {
-    const projects = loadProjects().map((project) => ({
-      ...project,
-      coverContent:
-        project.coverContent ?? INITIAL_BROCHURE_PROJECT.pages[0].content,
-      editorMode: project.editorMode ?? "designer",
-    }));
-
-    set({
-      folders: loadFolders(),
-      projects,
-    });
+  hydrate: () => {
+    if (get().hydrated) return;
+    const folders = ensureSeedFolders(loadFolders());
+    const projects = loadProjects().map(normalizeProject);
+    set({ folders, projects, hydrated: true });
   },
 
   createFolder: (name) => {
-    const folder: Folder = { id: createId(), name };
+    const folder: ProjectFolder = {
+      id: `folder-${crypto.randomUUID()}`,
+      name: name.trim(),
+      createdAt: new Date().toISOString(),
+    };
     const folders = [...get().folders, folder];
     saveFolders(folders);
     set({ folders });
+    return folder;
   },
 
-  renameFolder: (folderId, name) => {
-    const folders = get().folders.map((folder) =>
-      folder.id === folderId ? { ...folder, name } : folder,
-    );
-    saveFolders(folders);
-    set({ folders });
-  },
-
-  createProject: (name, folderId) => {
-    const project: DesignerProject = {
-      id: createId(),
-      name,
-      folderId,
-      updatedAt: new Date().toISOString(),
-      canvasJSON: null,
-      coverContent: INITIAL_BROCHURE_PROJECT.pages[0].content,
-      editorMode: "designer",
+  createProject: (name, folderId, template) => {
+    const coverContent = template === "t501" ? DEFAULT_COVER : undefined;
+    const editorMode: EditorMode = template === "t501" ? "template" : "designer";
+    const project = {
+      ...createProjectRecord(name, folderId, template),
+      coverContent,
+      editorMode,
     };
-
     const projects = [...get().projects, project];
     saveProjects(projects);
-    useBrochureEditorStore
-      .getState()
-      .loadCoverProject(project.name, project.coverContent);
-    useDesignEditorStore.getState().setMode("designer");
-    set({ projects, activeProjectId: project.id, view: "editor" });
-    return project.id;
+    set({ projects, activeProjectId: project.id, savedMessage: null });
+    return project;
   },
 
-  openProject: (projectId) => {
-    const project = get().projects.find((item) => item.id === projectId);
-    if (project) {
-      useBrochureEditorStore
-        .getState()
-        .loadCoverProject(project.name, project.coverContent);
-      useDesignEditorStore.getState().setMode(project.editorMode);
-    }
-
-    set({ activeProjectId: projectId, view: "editor" });
+  openProject: (id) => {
+    set({ activeProjectId: id, savedMessage: null });
   },
 
   closeProject: () => {
-    set({ activeProjectId: null, view: "manager" });
+    set({ activeProjectId: null, savedMessage: null });
   },
 
-  deleteProject: (projectId) => {
-    const projects = get().projects.filter((project) => project.id !== projectId);
-    saveProjects(projects);
-    set({
-      projects,
-      activeProjectId:
-        get().activeProjectId === projectId ? null : get().activeProjectId,
-      view: get().activeProjectId === projectId ? "manager" : get().view,
+  saveActiveProject: (payload) => {
+    const { activeProjectId, projects } = get();
+    if (!activeProjectId) return;
+
+    const existing = projects.find((p) => p.id === activeProjectId);
+    if (!existing) return;
+
+    const updated = upsertProject(existing, {
+      canvasJson: payload.canvasJson,
+      coverContent: payload.coverContent ?? existing.coverContent,
+      editorMode: payload.editorMode ?? existing.editorMode,
     });
-  },
-
-  moveProjectToFolder: (projectId, folderId) => {
-    const projects = get().projects.map((project) =>
-      project.id === projectId ? { ...project, folderId } : project,
-    );
-    saveProjects(projects);
-    set({ projects });
-  },
-
-  saveActiveProject: ({ canvasJSON, coverContent, editorMode }) => {
-    const activeProjectId = get().activeProjectId;
-    if (!activeProjectId) {
-      return;
-    }
-
-    const projects = get().projects.map((project) =>
-      project.id === activeProjectId
-        ? {
-            ...project,
-            canvasJSON,
-            coverContent,
-            editorMode,
-            updatedAt: new Date().toISOString(),
-          }
-        : project,
-    );
-
-    saveProjects(projects);
-    set({ projects, savedMessage: "Saved" });
+    const next = projects.map((p) => (p.id === updated.id ? updated : p));
+    saveProjects(next);
+    set({ projects: next, savedMessage: "Saved" });
     window.setTimeout(() => {
-      set({ savedMessage: null });
+      if (get().savedMessage === "Saved") {
+        set({ savedMessage: null });
+      }
     }, 2000);
   },
 
-  updateActiveProjectDraft: (canvasJSON) => {
-    const activeProjectId = get().activeProjectId;
-    if (!activeProjectId) {
-      return;
-    }
+  updateActiveProjectDraft: (canvasJson) => {
+    const { activeProjectId, projects } = get();
+    if (!activeProjectId) return;
 
+    const existing = projects.find((p) => p.id === activeProjectId);
+    if (!existing) return;
+
+    const updated = { ...existing, canvasJson };
+    const next = projects.map((p) => (p.id === updated.id ? updated : p));
+    set({ projects: next });
+  },
+
+  deleteProject: (id) => {
+    deleteProjectRecord(id);
+    const projects = get().projects.filter((p) => p.id !== id);
     set({
-      projects: get().projects.map((project) =>
-        project.id === activeProjectId ? { ...project, canvasJSON } : project,
-      ),
+      projects,
+      activeProjectId: get().activeProjectId === id ? null : get().activeProjectId,
     });
   },
 
-  setSavedMessage: (message) => set({ savedMessage: message }),
-
   getActiveProject: () => {
-    const activeProjectId = get().activeProjectId;
-    if (!activeProjectId) {
-      return null;
-    }
+    const { activeProjectId, projects } = get();
+    if (!activeProjectId) return null;
+    return projects.find((p) => p.id === activeProjectId) ?? null;
+  },
 
-    return get().projects.find((project) => project.id === activeProjectId) ?? null;
+  getFolderName: (folderId) => {
+    return get().folders.find((f) => f.id === folderId)?.name ?? "Unknown";
   },
 }));

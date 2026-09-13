@@ -60,10 +60,6 @@ export function PropertiesPanel() {
                 onChange={(value) => updateCoverContent({ tagline: value })}
               />
             </PanelSection>
-
-            <PanelSection title="Appearance" className="border-b-0 pb-0">
-              <Field label="Layout" value="Standard cover" />
-            </PanelSection>
           </>
         ) : (
           <ObjectProperties />

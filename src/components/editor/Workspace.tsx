@@ -3,7 +3,6 @@
 import { A4Page, T501Cover } from "@/components/brochure";
 import { useBrochureEditorStore, useDesignEditorStore } from "@/store";
 import { DesignCanvas } from "./DesignCanvas";
-import { EditorToolbar } from "./EditorToolbar";
 
 export function Workspace() {
   const mode = useDesignEditorStore((state) => state.mode);
@@ -14,30 +13,23 @@ export function Workspace() {
     (state) => state.project.pages[selectedPageIndex]?.content,
   );
 
-  if (mode === "template") {
-    if (!coverContent) {
-      return null;
-    }
-
-    return (
-      <main
-        className="@container-size flex h-full min-h-0 w-full items-center justify-center overflow-auto bg-rm-neutral-100 p-5"
-        aria-label="Document workspace"
-      >
-        <A4Page>
-          <T501Cover content={coverContent} />
-        </A4Page>
-      </main>
-    );
-  }
-
   return (
     <main
-      className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-rm-neutral-100"
+      className="relative min-h-0 flex-1 overflow-hidden bg-rm-neutral-100"
       aria-label="Document workspace"
     >
-      <EditorToolbar />
-      <div className="min-h-0 flex-1">
+      {mode === "template" && coverContent ? (
+        <div className="@container-size absolute inset-0 z-10 flex items-center justify-center overflow-auto p-5">
+          <A4Page>
+            <T501Cover content={coverContent} />
+          </A4Page>
+        </div>
+      ) : null}
+
+      <div
+        className={mode === "designer" ? "absolute inset-0" : "invisible absolute inset-0 -z-10"}
+        aria-hidden={mode !== "designer"}
+      >
         <DesignCanvas />
       </div>
     </main>
