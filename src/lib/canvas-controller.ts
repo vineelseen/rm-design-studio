@@ -6,6 +6,7 @@ import {
   IText,
   Line,
   Rect,
+  Triangle,
   loadSVGFromString,
   util,
 } from "fabric";
@@ -23,11 +24,13 @@ type SelectionListener = (meta: SelectedObjectMeta | null) => void;
 type TaggedFabricObject = FabricObject & {
   rmType?: string;
   rmLocked?: boolean;
+  rmFilename?: string;
 };
 
 const SERIALIZED_PROPERTIES = [
   "rmType",
   "rmLocked",
+  "rmFilename",
   "selectable",
   "evented",
   "hasControls",
@@ -41,41 +44,23 @@ function tagObject(object: FabricObject, rmType: string): TaggedFabricObject {
 }
 
 function getObjectType(object: FabricObject): SelectedObjectType {
-  const rmType = (object as FabricObject & { rmType?: string }).rmType;
-
+  const rmType = (object as TaggedFabricObject).rmType;
   if (rmType) {
     return rmType as SelectedObjectType;
   }
-
-  if (object instanceof IText) {
-    return "text";
-  }
-
-  if (object instanceof Rect) {
-    return "rect";
-  }
-
-  if (object instanceof Circle) {
-    return "circle";
-  }
-
-  if (object instanceof Line) {
-    return "line";
-  }
-
-  if (object instanceof FabricImage) {
-    return "image";
-  }
-
-  if (object.type === "group") {
-    return "group";
-  }
-
+  if (object instanceof IText) return "text";
+  if (object instanceof Triangle) return "triangle";
+  if (object instanceof Rect) return "rect";
+  if (object instanceof Circle) return "circle";
+  if (object instanceof Line) return "line";
+  if (object instanceof FabricImage) return "image";
+  if (object.type === "group") return "group";
   return "unknown";
 }
 
 function toMeta(object: FabricObject): SelectedObjectMeta {
   const bounds = object.getBoundingRect();
+  const tagged = object as TaggedFabricObject;
 
   const meta: SelectedObjectMeta = {
     type: getObjectType(object),
@@ -84,8 +69,11 @@ function toMeta(object: FabricObject): SelectedObjectMeta {
     width: Math.round(bounds.width),
     height: Math.round(bounds.height),
     angle: Math.round(object.angle ?? 0),
+    opacity: object.opacity ?? 1,
     fill: typeof object.fill === "string" ? object.fill : undefined,
     stroke: typeof object.stroke === "string" ? object.stroke : undefined,
+    strokeWidth: object.strokeWidth ?? undefined,
+    filename: tagged.rmFilename,
   };
 
   if (object instanceof IText) {
@@ -142,21 +130,50 @@ export class CanvasController {
     });
   }
 
-  addText() {
-    const text = new IText("Text", {
-      left: 80,
-      top: 120,
-      fontFamily: "Inter, sans-serif",
-      fontSize: 28,
-      fill: "#171D28",
-      fontWeight: "400",
-    });
-
-    tagObject(text, "text");
-    this.canvas.add(text);
-    this.canvas.setActiveObject(text);
+  private addAndSelect(object: FabricObject) {
+    this.canvas.add(object);
+    this.canvas.setActiveObject(object);
     this.canvas.renderAll();
     this.emitSelection();
+  }
+
+  addText(text = "Text", options?: Partial<{ fontSize: number; fontFamily: string; fontWeight: string }>) {
+    const item = new IText(text, {
+      left: A4_CANVAS_WIDTH / 2,
+      top: A4_CANVAS_HEIGHT / 3,
+      originX: "center",
+      originY: "center",
+      fontFamily: options?.fontFamily ?? "Inter, sans-serif",
+      fontSize: options?.fontSize ?? 28,
+      fill: "#171D28",
+      fontWeight: options?.fontWeight ?? "400",
+    });
+    tagObject(item, "text");
+    this.addAndSelect(item);
+  }
+
+  addHeading() {
+    this.addText("Add a heading", {
+      fontSize: 42,
+      fontFamily: "Sora, sans-serif",
+      fontWeight: "600",
+    });
+  }
+
+  addSubheading() {
+    this.addText("Add a subheading", {
+      fontSize: 28,
+      fontFamily: "Sora, sans-serif",
+      fontWeight: "600",
+    });
+  }
+
+  addBodyText() {
+    this.addText("Add body text", {
+      fontSize: 18,
+      fontFamily: "Inter, sans-serif",
+      fontWeight: "400",
+    });
   }
 
   addRectangle() {
@@ -169,12 +186,22 @@ export class CanvasController {
       stroke: RM_BRAND_BLUE,
       strokeWidth: 1,
     });
-
     tagObject(rect, "rect");
-    this.canvas.add(rect);
-    this.canvas.setActiveObject(rect);
-    this.canvas.renderAll();
-    this.emitSelection();
+    this.addAndSelect(rect);
+  }
+
+  addSquare() {
+    const rect = new Rect({
+      left: 140,
+      top: 200,
+      width: 120,
+      height: 120,
+      fill: RM_BRAND_BLUE,
+      stroke: RM_BRAND_BLUE,
+      strokeWidth: 1,
+    });
+    tagObject(rect, "rect");
+    this.addAndSelect(rect);
   }
 
   addCircle() {
@@ -186,12 +213,22 @@ export class CanvasController {
       stroke: RM_BRAND_BLUE,
       strokeWidth: 1,
     });
-
     tagObject(circle, "circle");
-    this.canvas.add(circle);
-    this.canvas.setActiveObject(circle);
-    this.canvas.renderAll();
-    this.emitSelection();
+    this.addAndSelect(circle);
+  }
+
+  addTriangle() {
+    const triangle = new Triangle({
+      left: 200,
+      top: 200,
+      width: 120,
+      height: 120,
+      fill: RM_BRAND_BLUE,
+      stroke: RM_BRAND_BLUE,
+      strokeWidth: 1,
+    });
+    tagObject(triangle, "triangle");
+    this.addAndSelect(triangle);
   }
 
   addLine() {
@@ -199,96 +236,87 @@ export class CanvasController {
       stroke: RM_BRAND_BLUE,
       strokeWidth: 3,
     });
-
     tagObject(line, "line");
-    this.canvas.add(line);
-    this.canvas.setActiveObject(line);
-    this.canvas.renderAll();
-    this.emitSelection();
+    this.addAndSelect(line);
   }
 
-  async addImageFromDataUrl(dataUrl: string) {
-    const image = await FabricImage.fromURL(dataUrl);
-    const maxWidth = A4_CANVAS_WIDTH * 0.45;
-    const scale = Math.min(1, maxWidth / (image.width ?? maxWidth));
+  async addImageFromDataUrl(dataUrl: string, filename?: string) {
+    const imageElement = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new window.Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.src = dataUrl;
+    });
+
+    const image = new FabricImage(imageElement);
+    const maxWidth = A4_CANVAS_WIDTH * 0.6;
+    const maxHeight = A4_CANVAS_HEIGHT * 0.6;
+    const scale = Math.min(
+      maxWidth / (image.width || maxWidth),
+      maxHeight / (image.height || maxHeight),
+      1,
+    );
 
     image.set({
-      left: A4_CANVAS_WIDTH * 0.45,
-      top: A4_CANVAS_HEIGHT * 0.45,
+      left: A4_CANVAS_WIDTH / 2,
+      top: A4_CANVAS_HEIGHT / 2,
       scaleX: scale,
       scaleY: scale,
       originX: "center",
       originY: "center",
     });
 
-    tagObject(image, "image");
-    this.canvas.add(image);
-    this.canvas.setActiveObject(image);
-    this.canvas.renderAll();
-    this.emitSelection();
+    const tagged = tagObject(image, "image");
+    if (filename) {
+      tagged.rmFilename = filename;
+    }
+
+    this.addAndSelect(image);
   }
 
-  async addSvgFromString(svg: string) {
+  async addSvgFromString(svg: string, filename?: string) {
     const { objects, options } = await loadSVGFromString(svg);
     const filtered = objects.filter(Boolean) as FabricObject[];
-
-    if (filtered.length === 0) {
-      return;
-    }
+    if (filtered.length === 0) return;
 
     const group = util.groupSVGElements(filtered, options);
-    group.scaleToWidth(180);
+    group.scaleToWidth(A4_CANVAS_WIDTH * 0.4);
     this.centerObject(group);
-    tagObject(group, "group");
-    this.canvas.add(group);
-    this.canvas.setActiveObject(group);
+    const tagged = tagObject(group, "group");
+    if (filename) tagged.rmFilename = filename;
+    this.addAndSelect(group);
+  }
+
+  applyBrandColor(color: string) {
+    const active = this.canvas.getActiveObject();
+    if (!active || (active as TaggedFabricObject).rmLocked) return;
+
+    if (active instanceof Line) {
+      active.set("stroke", color);
+    } else if (active instanceof IText) {
+      active.set("fill", color);
+    } else {
+      active.set({ fill: color, stroke: color });
+    }
+
+    active.setCoords();
     this.canvas.renderAll();
     this.emitSelection();
   }
 
-  async setLockedBackground(url: string) {
-    const existing = this.canvas
-      .getObjects()
-      .find((object) => (object as FabricObject & { rmLocked?: boolean }).rmLocked);
-
-    if (existing) {
-      this.canvas.remove(existing);
+  applyBrandFont(fontFamily: string) {
+    const active = this.canvas.getActiveObject();
+    if (active instanceof IText) {
+      active.set("fontFamily", fontFamily);
+      active.setCoords();
+      this.canvas.renderAll();
+      this.emitSelection();
     }
-
-    const image = await FabricImage.fromURL(url, { crossOrigin: "anonymous" });
-    image.set({
-      left: 0,
-      top: 0,
-      originX: "left",
-      originY: "top",
-      selectable: false,
-      evented: false,
-      hasControls: false,
-      hasBorders: false,
-      lockMovementX: true,
-      lockMovementY: true,
-    });
-
-    const scale = Math.max(
-      A4_CANVAS_WIDTH / (image.width ?? A4_CANVAS_WIDTH),
-      A4_CANVAS_HEIGHT / (image.height ?? A4_CANVAS_HEIGHT),
-    );
-
-    image.scale(scale);
-    const tagged = tagObject(image, "image");
-    tagged.rmLocked = true;
-
-    this.canvas.add(image);
-    this.canvas.sendObjectToBack(image);
-    this.canvas.renderAll();
   }
 
   deleteSelected() {
     const active = this.canvas.getActiveObject();
-    if (!active || (active as FabricObject & { rmLocked?: boolean }).rmLocked) {
-      return;
-    }
-
+    if (!active || (active as TaggedFabricObject).rmLocked) return;
     this.canvas.remove(active);
     this.canvas.discardActiveObject();
     this.canvas.renderAll();
@@ -297,71 +325,51 @@ export class CanvasController {
 
   bringForward() {
     const active = this.canvas.getActiveObject();
-    if (!active || (active as FabricObject & { rmLocked?: boolean }).rmLocked) {
-      return;
-    }
-
+    if (!active || (active as TaggedFabricObject).rmLocked) return;
     this.canvas.bringObjectForward(active);
     this.canvas.renderAll();
   }
 
   sendBackward() {
     const active = this.canvas.getActiveObject();
-    if (!active || (active as FabricObject & { rmLocked?: boolean }).rmLocked) {
-      return;
-    }
-
-    const objects = this.canvas.getObjects();
-    const lockedCount = objects.filter(
-      (object) => (object as FabricObject & { rmLocked?: boolean }).rmLocked,
-    ).length;
-
+    if (!active || (active as TaggedFabricObject).rmLocked) return;
+    const lockedCount = this.canvas
+      .getObjects()
+      .filter((o) => (o as TaggedFabricObject).rmLocked).length;
     this.canvas.sendObjectBackwards(active);
-
-    for (let index = 0; index < lockedCount; index += 1) {
-      const background = this.canvas.getObjects()[index];
-      if ((background as FabricObject & { rmLocked?: boolean }).rmLocked) {
-        this.canvas.sendObjectToBack(background);
+    for (let i = 0; i < lockedCount; i++) {
+      const bg = this.canvas.getObjects()[i];
+      if ((bg as TaggedFabricObject).rmLocked) {
+        this.canvas.sendObjectToBack(bg);
       }
     }
-
     this.canvas.renderAll();
   }
 
   async duplicateSelected() {
     const active = this.canvas.getActiveObject();
-    if (!active || (active as FabricObject & { rmLocked?: boolean }).rmLocked) {
-      return;
-    }
-
+    if (!active || (active as TaggedFabricObject).rmLocked) return;
     const clone = await active.clone();
     clone.set({
       left: (active.left ?? 0) + 20,
       top: (active.top ?? 0) + 20,
     });
-
-    const rmType = (active as FabricObject & { rmType?: string }).rmType;
-    if (rmType) {
-      (clone as FabricObject & { rmType: string }).rmType = rmType;
-    }
-
-    this.canvas.add(clone);
-    this.canvas.setActiveObject(clone);
-    this.canvas.renderAll();
-    this.emitSelection();
+    const rmType = (active as TaggedFabricObject).rmType;
+    if (rmType) (clone as TaggedFabricObject).rmType = rmType;
+    this.addAndSelect(clone);
   }
 
   updateActiveObject(updates: Partial<SelectedObjectMeta>) {
     const active = this.canvas.getActiveObject();
-    if (!active || (active as FabricObject & { rmLocked?: boolean }).rmLocked) {
-      return;
-    }
+    if (!active || (active as TaggedFabricObject).rmLocked) return;
 
     if (updates.left !== undefined) active.set("left", updates.left);
     if (updates.top !== undefined) active.set("top", updates.top);
     if (updates.angle !== undefined) active.set("angle", updates.angle);
+    if (updates.opacity !== undefined) active.set("opacity", updates.opacity);
     if (updates.fill !== undefined) active.set("fill", updates.fill);
     if (updates.stroke !== undefined) active.set("stroke", updates.stroke);
+    if (updates.strokeWidth !== undefined) active.set("strokeWidth", updates.strokeWidth);
 
     if (active instanceof IText) {
       if (updates.fontFamily !== undefined) active.set("fontFamily", updates.fontFamily);
@@ -375,11 +383,9 @@ export class CanvasController {
       const bounds = active.getBoundingRect();
       const nextWidth = updates.width ?? bounds.width;
       const nextHeight = updates.height ?? bounds.height;
-      const scaleX = nextWidth / Math.max(bounds.width, 1);
-      const scaleY = nextHeight / Math.max(bounds.height, 1);
       active.set({
-        scaleX: (active.scaleX ?? 1) * scaleX,
-        scaleY: (active.scaleY ?? 1) * scaleY,
+        scaleX: (active.scaleX ?? 1) * (nextWidth / Math.max(bounds.width, 1)),
+        scaleY: (active.scaleY ?? 1) * (nextHeight / Math.max(bounds.height, 1)),
       });
     }
 
@@ -395,20 +401,52 @@ export class CanvasController {
   async loadFromJSON(json: string | null) {
     this.canvas.clear();
     this.canvas.backgroundColor = "#ffffff";
-
     if (!json) {
       this.canvas.renderAll();
       this.emitSelection();
       return;
     }
-
     await this.canvas.loadFromJSON(JSON.parse(json));
     this.canvas.renderAll();
     this.emitSelection();
   }
 
   async applyTemplateBackground() {
-    await this.setLockedBackground(T501_ASSETS.coverBackground);
+    const existing = this.canvas
+      .getObjects()
+      .find((o) => (o as TaggedFabricObject).rmLocked);
+    if (existing) this.canvas.remove(existing);
+
+    const imgEl = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new window.Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Failed to load background"));
+      img.src = T501_ASSETS.coverBackground;
+    });
+
+    const image = new FabricImage(imgEl);
+    image.set({
+      left: 0,
+      top: 0,
+      originX: "left",
+      originY: "top",
+      selectable: false,
+      evented: false,
+      hasControls: false,
+      hasBorders: false,
+    });
+
+    const scale = Math.max(
+      A4_CANVAS_WIDTH / (image.width ?? A4_CANVAS_WIDTH),
+      A4_CANVAS_HEIGHT / (image.height ?? A4_CANVAS_HEIGHT),
+    );
+    image.scale(scale);
+    const tagged = tagObject(image, "image");
+    tagged.rmLocked = true;
+    this.canvas.add(image);
+    this.canvas.sendObjectToBack(image);
+    this.canvas.renderAll();
   }
 
   renderAll() {

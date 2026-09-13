@@ -1,9 +1,11 @@
+export { CreateDesignDialog } from "./CreateDesignDialog";
 export { DesignCanvas } from "./DesignCanvas";
-export { EditorToolbar } from "./EditorToolbar";
+export { EditorBootstrap } from "./EditorBootstrap";
 export { ObjectProperties } from "./ObjectProperties";
 export { PageListItem } from "./PageListItem";
-export { ProjectDialog } from "./ProjectDialog";
-export { ProjectManager } from "./ProjectManager";
+export { ProjectHome } from "./ProjectHome";
 export { PropertiesPanel } from "./PropertiesPanel";
 export { StudioRoot } from "./StudioRoot";
+export { ToolPanel } from "./ToolPanel";
+export { ToolRail } from "./ToolRail";
 export { Workspace } from "./Workspace";

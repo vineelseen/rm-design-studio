@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Eye, Save } from "lucide-react";
+import { Save } from "lucide-react";
 
 import { Button } from "@/components/ui";
 import {
@@ -20,7 +20,7 @@ export function TopBar() {
 
   const handleSave = () => {
     saveActiveProject({
-      canvasJSON: canvasController?.toJSON() ?? activeProject?.canvasJSON ?? null,
+      canvasJson: canvasController?.toJSON() ?? activeProject?.canvasJson ?? null,
       coverContent: getCoverContent(),
       editorMode,
     });
@@ -40,14 +40,14 @@ export function TopBar() {
             RM Design Studio
           </span>
           <span className="font-body text-xs leading-4 text-rm-neutral-500">
-            Brochure Builder
+            Design tools for Rugged Monitoring
           </span>
         </div>
       </button>
 
       <div className="absolute left-1/2 -translate-x-1/2 text-center">
         <span className="font-body text-sm font-semibold leading-5 text-rm-neutral-700">
-          {activeProject?.name ?? "Untitled Brochure"}
+          {activeProject?.name ?? "Untitled Design"}
         </span>
         {savedMessage ? (
           <span className="mt-0.5 block font-body text-xs text-rm-neutral-500">
@@ -61,12 +61,7 @@ export function TopBar() {
           <Save className="size-3.5" aria-hidden="true" />
           Save
         </Button>
-        <Button variant="secondary" disabled title="Coming soon">
-          <Eye className="size-3.5" aria-hidden="true" />
-          Preview
-        </Button>
-        <Button variant="primary" disabled title="Coming soon">
-          <Download className="size-3.5" aria-hidden="true" />
+        <Button variant="secondary" disabled title="Export not available in MVP">
           Export
         </Button>
       </div>

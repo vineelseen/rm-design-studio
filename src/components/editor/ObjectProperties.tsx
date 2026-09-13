@@ -21,11 +21,65 @@ function NumberField({
       value={String(value)}
       onChange={(next) => {
         const parsed = Number(next);
-        if (!Number.isNaN(parsed)) {
-          onChange(parsed);
-        }
+        if (!Number.isNaN(parsed)) onChange(parsed);
       }}
     />
+  );
+}
+
+function TransformSection({
+  selectedObject,
+  update,
+  showOpacity = true,
+}: {
+  selectedObject: SelectedObjectMeta;
+  update: (updates: Partial<SelectedObjectMeta>) => void;
+  showOpacity?: boolean;
+}) {
+  return (
+    <PanelSection title="Transform">
+      <NumberField
+        label="X"
+        value={selectedObject.left}
+        onChange={(value) => update({ left: value })}
+      />
+      <NumberField
+        label="Y"
+        value={selectedObject.top}
+        onChange={(value) => update({ top: value })}
+      />
+      <NumberField
+        label="Width"
+        value={selectedObject.width}
+        onChange={(value) => update({ width: value })}
+      />
+      <NumberField
+        label="Height"
+        value={selectedObject.height}
+        onChange={(value) => update({ height: value })}
+      />
+      <NumberField
+        label="Rotation"
+        value={selectedObject.angle}
+        onChange={(value) => update({ angle: value })}
+      />
+      {showOpacity ? (
+        <label className="block space-y-1">
+          <span className="font-body text-sm font-semibold leading-5 text-rm-neutral-700">
+            Opacity
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={selectedObject.opacity ?? 1}
+            onChange={(e) => update({ opacity: Number(e.target.value) })}
+            className="w-full"
+          />
+        </label>
+      ) : null}
+    </PanelSection>
   );
 }
 
@@ -34,57 +88,26 @@ export function ObjectProperties() {
   const canvasController = useDesignEditorStore((state) => state.canvasController);
 
   const update = (updates: Partial<SelectedObjectMeta>) => {
-    if (!selectedObject || !canvasController) {
-      return;
-    }
-
+    if (!selectedObject || !canvasController) return;
     canvasController.updateActiveObject(updates);
   };
 
   if (!selectedObject) {
     return (
-      <>
-        <PanelSection title="Page">
-          <Field label="Canvas" value="A4 Portrait" />
-          <Field label="Size" value="595 × 842 px" />
-        </PanelSection>
-        <PanelSection title="Selection" className="border-b-0 pb-0">
-          <Field label="Status" value="No object selected" />
-        </PanelSection>
-      </>
+      <PanelSection title="Document" className="border-b-0 pb-0">
+        <Field label="Format" value="A4 Portrait" />
+        <Field label="Size" value="210 × 297 mm" />
+      </PanelSection>
     );
   }
 
+  const isShape =
+    selectedObject.type === "rect" ||
+    selectedObject.type === "circle" ||
+    selectedObject.type === "triangle";
+
   return (
     <>
-      <PanelSection title="Position">
-        <NumberField
-          label="X"
-          value={selectedObject.left}
-          onChange={(value) => update({ left: value })}
-        />
-        <NumberField
-          label="Y"
-          value={selectedObject.top}
-          onChange={(value) => update({ top: value })}
-        />
-        <NumberField
-          label="Width"
-          value={selectedObject.width}
-          onChange={(value) => update({ width: value })}
-        />
-        <NumberField
-          label="Height"
-          value={selectedObject.height}
-          onChange={(value) => update({ height: value })}
-        />
-        <NumberField
-          label="Rotation"
-          value={selectedObject.angle}
-          onChange={(value) => update({ angle: value })}
-        />
-      </PanelSection>
-
       {selectedObject.type === "text" ? (
         <PanelSection title="Text">
           <InputField
@@ -94,7 +117,7 @@ export function ObjectProperties() {
           />
           <label className="block space-y-1">
             <span className="font-body text-sm font-semibold leading-5 text-rm-neutral-700">
-              Font family
+              Font
             </span>
             <select
               value={selectedObject.fontFamily ?? FONT_OPTIONS[0].value}
@@ -109,13 +132,13 @@ export function ObjectProperties() {
             </select>
           </label>
           <NumberField
-            label="Font size"
+            label="Size"
             value={selectedObject.fontSize ?? 28}
             onChange={(value) => update({ fontSize: value })}
           />
           <label className="block space-y-1">
             <span className="font-body text-sm font-semibold leading-5 text-rm-neutral-700">
-              Font weight
+              Weight
             </span>
             <select
               value={String(selectedObject.fontWeight ?? "400")}
@@ -148,47 +171,76 @@ export function ObjectProperties() {
             </div>
           </label>
           <ColorControl
-            label="Text color"
+            label="Color"
             value={selectedObject.fill ?? "#171D28"}
             onChange={(value) => update({ fill: value })}
           />
         </PanelSection>
       ) : null}
 
-      {selectedObject.type === "rect" || selectedObject.type === "circle" ? (
+      {isShape ? (
         <PanelSection title="Shape">
           <ColorControl
-            label="Fill color"
+            label="Fill"
             value={selectedObject.fill ?? "#0F52BA"}
             onChange={(value) => update({ fill: value })}
-            showFill
-            fillValue={selectedObject.fill ?? "#0F52BA"}
-            onFillChange={(value) => update({ fill: value })}
-            showStroke
-            strokeValue={selectedObject.stroke ?? "#0F52BA"}
-            onStrokeChange={(value) => update({ stroke: value })}
           />
+          <ColorControl
+            label="Stroke"
+            value={selectedObject.stroke ?? "#0F52BA"}
+            onChange={(value) => update({ stroke: value })}
+          />
+          <NumberField
+            label="Stroke width"
+            value={selectedObject.strokeWidth ?? 1}
+            onChange={(value) => update({ strokeWidth: value })}
+          />
+          <label className="block space-y-1">
+            <span className="font-body text-sm font-semibold leading-5 text-rm-neutral-700">
+              Opacity
+            </span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={selectedObject.opacity ?? 1}
+              onChange={(e) => update({ opacity: Number(e.target.value) })}
+              className="w-full"
+            />
+          </label>
         </PanelSection>
       ) : null}
 
       {selectedObject.type === "line" ? (
-        <PanelSection title="Line">
+        <PanelSection title="Shape">
           <ColorControl
-            label="Stroke color"
+            label="Stroke"
             value={selectedObject.stroke ?? "#0F52BA"}
             onChange={(value) => update({ stroke: value })}
+          />
+          <NumberField
+            label="Stroke width"
+            value={selectedObject.strokeWidth ?? 3}
+            onChange={(value) => update({ strokeWidth: value })}
           />
         </PanelSection>
       ) : null}
 
       {selectedObject.type === "image" || selectedObject.type === "group" ? (
-        <PanelSection title="Image" className="border-b-0 pb-0">
+        <PanelSection title="Image">
           <Field
-            label="Type"
-            value={selectedObject.type === "group" ? "SVG group" : "Raster image"}
+            label="Filename"
+            value={selectedObject.filename ?? "Uploaded image"}
           />
         </PanelSection>
       ) : null}
+
+      <TransformSection
+        selectedObject={selectedObject}
+        update={update}
+        showOpacity={selectedObject.type !== "line" && !isShape}
+      />
     </>
   );
 }

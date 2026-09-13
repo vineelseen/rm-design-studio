@@ -4,19 +4,25 @@ import { useEffect } from "react";
 
 import { AppShell } from "@/components/layout";
 import { useProjectStore } from "@/store";
-import { ProjectManager } from "./ProjectManager";
+import { EditorBootstrap } from "./EditorBootstrap";
+import { ProjectHome } from "./ProjectHome";
 
 export function StudioRoot() {
-  const view = useProjectStore((state) => state.view);
-  const loadFromStorage = useProjectStore((state) => state.loadFromStorage);
+  const activeProjectId = useProjectStore((state) => state.activeProjectId);
+  const hydrate = useProjectStore((state) => state.hydrate);
 
   useEffect(() => {
-    loadFromStorage();
-  }, [loadFromStorage]);
+    hydrate();
+  }, [hydrate]);
 
-  if (view === "manager") {
-    return <ProjectManager />;
+  if (!activeProjectId) {
+    return <ProjectHome />;
   }
 
-  return <AppShell />;
+  return (
+    <>
+      <EditorBootstrap />
+      <AppShell />
+    </>
+  );
 }

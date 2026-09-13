@@ -10,6 +10,7 @@ export function DesignCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<CanvasController | null>(null);
+  const loadedProjectRef = useRef<string | null>(null);
   const [displayScale, setDisplayScale] = useState(0.8);
 
   const setCanvasController = useDesignEditorStore(
@@ -19,11 +20,10 @@ export function DesignCanvas() {
     (state) => state.setSelectedObject,
   );
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
+
   useEffect(() => {
     const element = canvasRef.current;
-    if (!element) {
-      return;
-    }
+    if (!element) return;
 
     const controller = new CanvasController(element);
     controllerRef.current = controller;
@@ -35,31 +35,28 @@ export function DesignCanvas() {
       controllerRef.current = null;
       setCanvasController(null);
       setSelectedObject(null);
+      loadedProjectRef.current = null;
     };
   }, [setCanvasController, setSelectedObject]);
 
   useEffect(() => {
     const controller = controllerRef.current;
-    if (!controller || !activeProjectId) {
-      return;
-    }
+    if (!controller || !activeProjectId) return;
+    if (loadedProjectRef.current === activeProjectId) return;
 
     const project = useProjectStore
       .getState()
       .projects.find((item) => item.id === activeProjectId);
 
-    if (!project) {
-      return;
-    }
+    if (!project) return;
 
-    void controller.loadFromJSON(project.canvasJSON);
+    loadedProjectRef.current = activeProjectId;
+    void controller.loadFromJSON(project.canvasJson);
   }, [activeProjectId]);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
-    if (!wrapper) {
-      return;
-    }
+    if (!wrapper) return;
 
     const updateScale = () => {
       const availableWidth = wrapper.clientWidth - 32;
@@ -83,9 +80,7 @@ export function DesignCanvas() {
         target?.tagName === "TEXTAREA" ||
         target?.isContentEditable;
 
-      if (isTyping) {
-        return;
-      }
+      if (isTyping) return;
 
       if (event.key === "Delete" || event.key === "Backspace") {
         controllerRef.current?.deleteSelected();

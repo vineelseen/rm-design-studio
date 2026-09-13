@@ -5,9 +5,12 @@ export type {
 } from "./brochure";
 
 export type {
-  DesignerProject,
   EditorMode,
-  Folder,
+  Project,
+  ProjectFolder,
+  ProjectTemplate,
   SelectedObjectMeta,
   SelectedObjectType,
+  ToolPanelId,
+  UploadedAsset,
 } from "./project";
